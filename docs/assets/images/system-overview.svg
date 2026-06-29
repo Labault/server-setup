@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 520" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif" role="img" aria-labelledby="title desc">
+  <title id="title">server-setup system overview</title>
+  <desc id="desc">install.sh symlinks the server CLI into /usr/local/bin. The CLI exposes setup, doctor, confirm, list and update. server setup converges a fresh box toward a profile's desired state (deploy user, ufw, fail2ban, swap, the SSH cutover, Docker and the web network), writes /var/lib/server-setup/state.yaml with managed files and re-checkable assertions, and arms a 10-minute anti-lockout dead-man's switch during the SSH cutover. That is the finish line: server-setup stops at the doormat, where push-to-deploy clones and runs docker compose up -d.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#6b7280"/>
+    </marker>
+  </defs>
+  <rect width="860" height="520" fill="#ffffff"/>
+
+  <!-- install.sh -->
+  <rect x="180" y="20" width="500" height="62" rx="10" fill="#fff3e6" stroke="#e08a3c" stroke-width="1.5"/>
+  <text x="430" y="46" text-anchor="middle" font-size="16" font-weight="700" fill="#1f2937">install.sh</text>
+  <text x="430" y="68" text-anchor="middle" font-size="12" fill="#4b5563">symlinks `server` into /usr/local/bin · runs as root on the box</text>
+
+  <line x1="430" y1="82" x2="430" y2="100" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- server CLI -->
+  <rect x="330" y="100" width="200" height="46" rx="10" fill="#e6f0ff" stroke="#3b74d6" stroke-width="1.5"/>
+  <text x="430" y="128" text-anchor="middle" font-size="15" font-weight="700" fill="#1f2937">the server CLI</text>
+
+  <!-- branch lines to commands -->
+  <line x1="430" y1="146" x2="102" y2="186" stroke="#6b7280" stroke-width="1.3" marker-end="url(#arrow)"/>
+  <line x1="430" y1="146" x2="266" y2="186" stroke="#6b7280" stroke-width="1.3" marker-end="url(#arrow)"/>
+  <line x1="430" y1="146" x2="430" y2="186" stroke="#6b7280" stroke-width="1.3" marker-end="url(#arrow)"/>
+  <line x1="430" y1="146" x2="594" y2="186" stroke="#6b7280" stroke-width="1.3" marker-end="url(#arrow)"/>
+  <line x1="430" y1="146" x2="758" y2="186" stroke="#6b7280" stroke-width="1.3" marker-end="url(#arrow)"/>
+
+  <!-- command boxes -->
+  <rect x="26" y="188" width="152" height="44" rx="9" fill="#e9f6ec" stroke="#3fa45e" stroke-width="1.5"/>
+  <text x="102" y="215" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2937">setup</text>
+  <rect x="190" y="188" width="152" height="44" rx="9" fill="#e9f6ec" stroke="#3fa45e" stroke-width="1.5"/>
+  <text x="266" y="215" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2937">doctor</text>
+  <rect x="354" y="188" width="152" height="44" rx="9" fill="#e9f6ec" stroke="#3fa45e" stroke-width="1.5"/>
+  <text x="430" y="215" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2937">confirm</text>
+  <rect x="518" y="188" width="152" height="44" rx="9" fill="#e9f6ec" stroke="#3fa45e" stroke-width="1.5"/>
+  <text x="594" y="215" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2937">list</text>
+  <rect x="682" y="188" width="152" height="44" rx="9" fill="#e9f6ec" stroke="#3fa45e" stroke-width="1.5"/>
+  <text x="758" y="215" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2937">update</text>
+
+  <!-- setup -> what it does -->
+  <line x1="102" y1="232" x2="102" y2="262" stroke="#6b7280" stroke-width="1.3"/>
+  <line x1="102" y1="262" x2="430" y2="262" stroke="#6b7280" stroke-width="1.3"/>
+  <line x1="430" y1="262" x2="430" y2="280" stroke="#6b7280" stroke-width="1.3" marker-end="url(#arrow)"/>
+
+  <!-- converge panel -->
+  <rect x="150" y="280" width="560" height="120" rx="10" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5"/>
+  <text x="430" y="306" text-anchor="middle" font-size="14" font-weight="700" fill="#1f2937">server setup --profile &lt;minimal | docker | web&gt;</text>
+  <text x="430" y="330" text-anchor="middle" font-size="12" fill="#4b5563">converges the box: deploy user · ufw · fail2ban · swap · SSH cutover · Docker · web network</text>
+  <text x="430" y="352" text-anchor="middle" font-size="12" fill="#4b5563">writes /var/lib/server-setup/state.yaml — managed files (hashed) + assertions (predicates)</text>
+  <text x="430" y="374" text-anchor="middle" font-size="12" fill="#4b5563">arms a 10-min anti-lockout dead-man's switch on the SSH cutover · `server confirm` disarms it</text>
+
+  <line x1="430" y1="400" x2="430" y2="424" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- finish line -->
+  <rect x="150" y="424" width="560" height="72" rx="10" fill="#f3e8ff" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="430" y="452" text-anchor="middle" font-size="15" font-weight="700" fill="#1f2937">the doormat — the finish line</text>
+  <text x="430" y="476" text-anchor="middle" font-size="12" fill="#4b5563">server-setup stops here · push-to-deploy clones and runs `docker compose up -d`, no manual step in between</text>
+</svg>

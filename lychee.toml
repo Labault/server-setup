@@ -11,6 +11,9 @@ exclude = [
   "^https?://localhost",
   "^https?://127\\.0\\.0\\.1",
   "^https?://0\\.0\\.0\\.0",
+  # This repo is private: its own badge/self URLs can't be checked anonymously
+  # (they 404 without a token). The public sibling repos stay checked.
+  "^https?://github\\.com/Labault/server-setup",
 ]
 
 exclude_path = [

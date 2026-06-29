@@ -1,0 +1,36 @@
+# Changelog
+
+All notable changes to this project are documented here.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- The `server` CLI: a desired-state convergence engine that hardens a fresh
+  Ubuntu box and lays the `push-to-deploy` doormat (`install.sh` symlinks it into
+  `/usr/local/bin`).
+- Profiles `minimal → docker → web` with inheritance, parsed from manifests by a
+  hand-rolled `awk` parser (no `yq`).
+- `server setup --profile <p>`: converges the box, idempotent, writes
+  `/var/lib/server-setup/state.yaml` (managed files + assertions), backs up system
+  files before overwriting them. `--dry-run` on every mutating command; EUID 0
+  required for mutations.
+- The SSH cutover (root off, password off) behind the **anti-lockout sequence**:
+  `sshd -t` on the merged config, a loopback key self-test, a 10-minute
+  `systemd-run` dead-man's switch, `server confirm` to lock it in, and `reload`
+  (never `restart`).
+- `server doctor`: re-evaluates the converged profile's assertions (reusing
+  `lib/assert.sh` as the single source) and reports drift plus `push-to-deploy`
+  health. Never mutates. Exit codes for CI, `--strict`.
+- `server list` and `server update` (self-update via `git pull --ff-only`, never
+  touches the converged box).
+- `bats` unit tests of the pure logic, plus a black-box `validation/` harness that
+  converges a disposable systemd container through the full chain and runs in CI.
+- Docs: README, architecture, a page per profile, a hand-written system-overview
+  diagram, the locked spec, and the four-repo family cross-links.
+- The Friday easter egg (D14): a non-blocking duck wink on `server setup`.
+
+[Unreleased]: https://github.com/Labault/server-setup/commits/main

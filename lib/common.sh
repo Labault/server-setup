@@ -82,6 +82,17 @@ server_version() {
   fi
 }
 
+# friday_wink — the D14 easter egg. On a Friday the duck gives you a look, then
+# waves you through. It is NEVER a gate: provisioning a server must not hinge on
+# the day of the week, so this only prints a line and the action proceeds either
+# way. SERVER_FORCE_FRIDAY=1 forces it (for the demo/tests).
+friday_wink() {
+  if [[ "$(date +%u)" == 5 || "${SERVER_FORCE_FRIDAY:-}" == 1 ]]; then
+    printf '%s🦆 vendredi : le canard te regarde de travers, mais il te laisse passer.%s\n' \
+      "$C_DIM" "$C_RESET" >&2
+  fi
+}
+
 # file_sha256 <file> -> hex sha256 of the file (portable: shasum or sha256sum).
 file_sha256() {
   if command -v sha256sum >/dev/null 2>&1; then

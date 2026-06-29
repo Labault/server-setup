@@ -60,6 +60,8 @@ EOF
   # --profile is mandatory and explicit: no silent default, no `detect` (A1).
   [[ -n "$profile" ]] || die "--profile is required (minimal|docker|web). There is no default."
 
+  friday_wink # D14: non-blocking; the duck never bars the road.
+
   # Resolve the inheritance chain (validates the profile too).
   local chain
   chain="$(resolve_chain "$profile" | paste -sd ' ' -)"

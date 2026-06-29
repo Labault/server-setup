@@ -89,6 +89,13 @@ setup() {
   [[ "$output" == *"/templates/sysctl/99-server-setup.paranoid.conf" ]]
 }
 
+@test "friday_wink quacks when forced and never blocks (D14)" {
+  SERVER_FORCE_FRIDAY=1
+  run friday_wink
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"🦆"* ]]
+}
+
 @test "managed-file units point at existing templates" {
   local u line tpl
   for u in fail2ban unattended-upgrades journald-cap sysctl-baseline ssh-hardening docker-daemon-json; do
