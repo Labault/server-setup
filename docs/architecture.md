@@ -85,4 +85,4 @@ validation/             # black-box container harness (see validation/README.md)
   (shellcheck + shfmt + bats).
 - **The SSH cutover never `restart`s sshd** — only `reload`, so established
   sessions survive. The full anti-lockout sequence is the locked spec's §9.4
-  (see [`docs/Cahier des charges.md`](Cahier%20des%20charges.md)).
+  (see [`docs/cahier-des-charges-server-setup.md`](cahier-des-charges-server-setup.md)).

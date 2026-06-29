@@ -52,7 +52,7 @@ Quality and tooling go through `make` (tools come from the machine, not the repo
 
 ## Project rules
 
-- The locked spec is `docs/Cahier des charges.md` (French). Decisions in its §11
+- The locked spec is `docs/cahier-des-charges-server-setup.md` (French). Decisions in its §11
   are settled, don't relitigate them.
 - Adding a **profile** is data (`profiles/*.yaml`). Adding a **unit type** is code
   (a predicate in `assert.sh` + an action in `converge.sh`).

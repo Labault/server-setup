@@ -3,7 +3,7 @@
 # server — converges a fresh Ubuntu box toward a hardened, deployable state, up
 # to the exact line where push-to-deploy takes over. It hardens the OS and lays
 # the doormat (deploy user, docker, `web` network); it never deploys an app.
-# See docs/Cahier des charges.md.
+# See docs/cahier-des-charges-server-setup.md.
 #
 set -euo pipefail
 

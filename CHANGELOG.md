@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Docs: renamed the locked spec `docs/Cahier des charges.md` to
+  `docs/cahier-des-charges-server-setup.md` (kebab-case, no spaces) to match the
+  family's naming convention and stop breaking relative links and tooling.
+  Updated all references (architecture doc, `CLAUDE.md`, `bin/server`).
+
 ### Fixed
 
 - The SSH cutover now refuses up front (fail-fast) when the `deploy` user has no
