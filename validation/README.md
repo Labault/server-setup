@@ -27,13 +27,15 @@ state left by earlier converge cases).
 
 Two things physically don't work in a container, by design, not by bug:
 
-| Not testable in a container | Why | Proven instead on… |
+| Not reliable in a container | Why | Proven instead on… |
 |---|---|---|
-| `swap` unit | `swapon` is blocked in a container (swap is a host-global resource) | the real VPS (dogfooding) |
+| `swap` unit | `swapon` is host-dependent inside a container — it works on some kernels (GitHub runners) and not others (overlay-backed Docker) | the real VPS (dogfooding) |
 | the real, lock-you-out SSH `reload` | the cutover runs here, but the only way to truly prove "you can still get in after root SSH is off" is a real remote session | the real VPS (dogfooding) |
 
-So in the container, a converged box shows **exactly one drift — `swap`** — and
-everything else green. `doctor`'s all-green / exit-0 state is the VPS story.
+So in the container, the only unit that may drift is `swap` — everything else is
+green. Depending on the host there are **zero drifts (swap converged) or exactly
+one (swap)**, never a non-swap drift. `doctor`'s guaranteed all-green / exit-0 is
+the VPS story.
 
 > The SSH cutover sequence itself (sshd -t, loopback key self-test, dead-man's
 > switch arm/rollback, `server confirm`) IS exercised here and was dogfooded on a
