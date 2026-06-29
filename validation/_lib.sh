@@ -55,7 +55,10 @@ exit_is() { [[ "$LAST_RC" == "$1" ]] && echo 1 || echo 0; }
 exit_nonzero() { [[ "$LAST_RC" -ne 0 ]] && echo 1 || echo 0; }
 out_has() { [[ "$LAST_OUT" == *"$1"* ]] && echo 1 || echo 0; }
 out_hasnt() { [[ "$LAST_OUT" != *"$1"* ]] && echo 1 || echo 0; }
-out_count() { grep -c -- "$1" <<<"$LAST_OUT" 2>/dev/null || echo 0; }
+# grep -c already prints "0" on no match (and exits 1); `|| true` just swallows
+# that exit. Using `|| echo 0` would DOUBLE the output to "0\n0" and break the
+# numeric comparisons that consume it.
+out_count() { grep -c -- "$1" <<<"$LAST_OUT" 2>/dev/null || true; }
 # box_ok "<cmd>" -> 1 when the command exits 0 inside the box (state probe).
 box_ok() { docker exec "$BOX" bash -lc "$1" >/dev/null 2>&1 && echo 1 || echo 0; }
 
