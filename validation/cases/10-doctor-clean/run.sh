@@ -11,6 +11,7 @@ check "ufw-base green" "$(out_has '✓ ufw-base')"
 check "ssh-hardening green" "$(out_has '✓ ssh-hardening')"
 check "docker-engine green" "$(out_has '✓ docker-engine')"
 check "web-network green" "$(out_has '✓ web-network')"
+check "timesync green" "$(out_has '✓ timesync')"
 check "push-to-deploy section present" "$(out_has 'push-to-deploy')"
 
 # Zero drifts, or exactly one that is swap — never anything else.

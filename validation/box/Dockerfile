@@ -5,6 +5,12 @@
 # running sshd so the SSH cutover's `reload` works like it does on a real VPS.
 # Everything else (ufw, fail2ban, Docker…) is installed BY the convergence under
 # test — that's the point.
+#
+# Deliberately NOT shipped: systemd-timesyncd. A fresh Hetzner box doesn't have
+# it either, so leaving it out makes the box reproduce reality — `do_timesync`
+# must install it (a box that ships it would mask that bug, and once did). We DO
+# ship chrony, a competing NTP daemon, so the convergence's purge-the-rival path
+# is actually exercised: a real box may arrive with chrony owning the clock.
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -12,7 +18,7 @@ ENV container=docker
 
 RUN apt-get update -qq && \
     apt-get install -y -qq --no-install-recommends \
-        systemd systemd-sysv systemd-timesyncd \
+        systemd systemd-sysv chrony \
         sudo iproute2 ca-certificates curl gnupg openssh-server && \
     systemctl enable ssh && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /var/log/*

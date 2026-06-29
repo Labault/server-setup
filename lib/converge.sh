@@ -303,8 +303,25 @@ do_locale() {
 }
 
 do_timesync() {
-  timedatectl set-ntp true >/dev/null 2>&1 || true
+  # One explicit NTP path: systemd-timesyncd. If a competing daemon owns the
+  # clock (chrony, ntp/ntpsec), remove it so timesyncd can take over — opinionated
+  # by design (explicit > implicit), never two NTP daemons in parallel.
+  local rival
+  for rival in chrony ntp ntpsec; do
+    if dpkg -s "$rival" >/dev/null 2>&1; then
+      log_info "removing competing NTP daemon ${rival}…"
+      systemctl disable --now "$rival" >/dev/null 2>&1 || true
+      DEBIAN_FRONTEND=noninteractive apt-get purge -y -qq "$rival" >/dev/null 2>&1 || true
+    fi
+  done
+  # A VPS with no time daemon is a provisioning failure, not a thing to mask:
+  # ensure_pkg dies cleanly if the install fails (the old code only enabled the
+  # unit, silently no-op'ing on a box where the package was absent → drift).
+  ensure_pkg systemd-timesyncd
+  # Some images ship the unit masked; unmask before enabling.
+  systemctl unmask systemd-timesyncd >/dev/null 2>&1 || true
   systemctl enable systemd-timesyncd >/dev/null 2>&1 || true
+  timedatectl set-ntp true >/dev/null 2>&1 || true
   # Don't hard-fail on start: inside a container the unit is condition-skipped by
   # design (the host keeps the clock). The re-assert decides what counts.
   systemctl start systemd-timesyncd >/dev/null 2>&1 || true

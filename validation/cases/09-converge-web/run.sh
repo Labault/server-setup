@@ -13,6 +13,12 @@ check "Docker daemon up" "$(box_ok 'systemctl is-active --quiet docker')"
 check "web network present" "$(box_ok 'docker network inspect web')"
 check "deploy user present" "$(box_ok 'id -u deploy')"
 check "deploy in the docker group" "$(box_ok 'id -nG deploy | grep -qw docker')"
+# One explicit NTP path: timesyncd installed and enabled, the chrony shipped by
+# the box purged. In a container the unit is condition-skipped (host owns the
+# clock), so is-enabled is as far as we can probe — same invariant assert_timesync
+# accepts here; is-active is dogfooded on the real VPS (D15).
+check "systemd-timesyncd enabled" "$(box_ok 'systemctl is-enabled --quiet systemd-timesyncd')"
+check "chrony purged" "$(box_ok '! dpkg -s chrony >/dev/null 2>&1')"
 check "ufw 22 open" "$(box_ok 'ufw status | grep 22/tcp | grep -qw ALLOW')"
 check "ufw 80 open" "$(box_ok 'ufw status | grep 80/tcp | grep -qw ALLOW')"
 check "ufw 443 open" "$(box_ok 'ufw status | grep 443/tcp | grep -qw ALLOW')"

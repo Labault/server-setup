@@ -25,6 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `timesync` no longer drifts on a real VPS. `do_timesync` only ran
+  `systemctl enable systemd-timesyncd` without ever installing the package, so on
+  a box where it was absent (a fresh Hetzner image) the `enable` silently no-op'd
+  (`|| true`) and `server doctor` reported drift. The bug was masked in CI by the
+  validation Dockerfile, which pre-installed `systemd-timesyncd` so the box lied
+  about a fresh box's real state. Two fixes: `do_timesync` now removes a competing
+  NTP daemon (`chrony`/`ntp`/`ntpsec`) if present, installs `systemd-timesyncd`
+  (failing the provisioning if the install fails, instead of masking it) and
+  unmasks the unit before enabling; the validation box drops `systemd-timesyncd`
+  and ships `chrony` instead, so it reproduces a fresh Hetzner box and exercises
+  the purge path.
 - The SSH cutover now refuses up front (fail-fast) when the `deploy` user has no
   `authorized_keys`, instead of switching to key-only SSH and relying on the
   dead-man's switch to rescue a predictable lockout. Override with the explicit

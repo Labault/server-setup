@@ -87,6 +87,15 @@ setup() {
   declare -f assert_unit | grep -q 'ssh-hardening)'
 }
 
+@test "do_timesync purges rivals, installs the package and unmasks before enabling" {
+  local body
+  body="$(declare -f do_timesync)"
+  grep -q 'ensure_pkg systemd-timesyncd' <<<"$body"
+  grep -q 'unmask systemd-timesyncd' <<<"$body"
+  grep -qE 'for rival in .*chrony' <<<"$body"
+  grep -q 'apt-get purge' <<<"$body"
+}
+
 @test "deadman rollback restores the previous drop-in, or removes it when new" {
   run deadman_render_rollback /etc/ssh/sshd_config.d/99-server-setup.conf /var/lib/server-setup/ssh-rollback.prev
   [ "$status" -eq 0 ]
