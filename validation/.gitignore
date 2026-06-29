@@ -1,0 +1,3 @@
+# Per-run artefacts written by the cases — regenerated on every run-all.sh.
+cases/*/output.log
+cases/*/RESULT.txt
