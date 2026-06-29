@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Validation case `03b-deadman-rollback`: an in-container acceptance test that
+  arms a short dead-man's window, deliberately doesn't confirm, and proves the
+  timer FIRES and restores the pre-cutover SSH state (DoD #5). Closes the gap
+  where the rollback's firing was exercised nowhere — `convergence.bats` only
+  rendered the rollback script, and case 03 confirmed immediately.
 - The `server` CLI: a desired-state convergence engine that hardens a fresh
   Ubuntu box and lays the `push-to-deploy` doormat (`install.sh` symlinks it into
   `/usr/local/bin`).

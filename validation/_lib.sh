@@ -62,6 +62,24 @@ out_count() { grep -c -- "$1" <<<"$LAST_OUT" 2>/dev/null || true; }
 # box_ok "<cmd>" -> 1 when the command exits 0 inside the box (state probe).
 box_ok() { docker exec "$BOX" bash -lc "$1" >/dev/null 2>&1 && echo 1 || echo 0; }
 
+# wait_box "<label>" "<cmd>" [tries] -> poll a box command (as root) until it
+# exits 0, up to <tries> attempts one second apart. Lets a case wait for an
+# asynchronous state change (e.g. a systemd-run timer firing) without a blind
+# sleep that's either flaky or needlessly slow. Logs the outcome; returns 0 as
+# soon as the command succeeds, non-zero if it never does.
+wait_box() {
+  local label="$1" cmd="$2" tries="${3:-20}" i
+  for ((i = 1; i <= tries; i++)); do
+    if docker exec "$BOX" bash -lc "$cmd" >/dev/null 2>&1; then
+      { printf '\n# %s — satisfied after %ds\n' "$label" "$i"; } >>"$LOG"
+      return 0
+    fi
+    sleep 1
+  done
+  { printf '\n# %s — NOT satisfied after %ds\n' "$label" "$tries"; } >>"$LOG"
+  return 1
+}
+
 # verdict -> write RESULT.txt (PASS/FAIL) and return accordingly.
 verdict() {
   if [[ "$_FAILS" -eq 0 ]]; then
