@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-29
+
 ### Security
 
 - A profile name is now validated for format (`^[a-z][a-z0-9-]*$`) at the head of
@@ -106,4 +108,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diagram, the locked spec, and the four-repo family cross-links.
 - The Friday easter egg (D14): a non-blocking duck wink on `server setup`.
 
-[Unreleased]: https://github.com/Labault/server-setup/commits/main
+[Unreleased]: https://github.com/Labault/server-setup/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Labault/server-setup/releases/tag/v0.2.0
