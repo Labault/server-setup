@@ -13,9 +13,9 @@ setup() {
   source "$SERVER_ROOT/lib/converge.sh"
 }
 
-# The 11 units server-setup actually implements here (ssh-hardening is declared
-# by the profile but deferred to the SSH cutover).
-IMPLEMENTED="deploy-user ufw-base fail2ban unattended-upgrades timezone locale timesync swap journald-cap github-known-hosts sysctl-baseline"
+# The 12 units server-setup implements for the minimal profile, ssh-hardening
+# (the SSH cutover) included.
+IMPLEMENTED="deploy-user ufw-base fail2ban unattended-upgrades timezone locale timesync swap journald-cap github-known-hosts sysctl-baseline ssh-hardening"
 
 @test "minimal resolves to the 12 declared units, ssh-hardening last" {
   run resolve_units minimal
@@ -25,8 +25,22 @@ IMPLEMENTED="deploy-user ufw-base fail2ban unattended-upgrades timezone locale t
   [ "${lines[11]}" = "ssh-hardening" ]
 }
 
-@test "ssh-hardening is registered as deferred" {
-  [[ "$DEFERRED_UNITS" == *" ssh-hardening "* ]]
+@test "ssh-hardening is implemented, not deferred" {
+  [[ "$DEFERRED_UNITS" != *" ssh-hardening "* ]]
+  declare -f do_unit | grep -q 'ssh-hardening)'
+  declare -f assert_unit | grep -q 'ssh-hardening)'
+}
+
+@test "deadman rollback restores the previous drop-in, or removes it when new" {
+  run deadman_render_rollback /etc/ssh/sshd_config.d/99-server-setup.conf /var/lib/server-setup/ssh-rollback.prev
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"cp -a"* ]]
+  [[ "$output" == *"reload ssh"* ]]
+
+  run deadman_render_rollback /etc/ssh/sshd_config.d/99-server-setup.conf ""
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"rm -f"* ]]
+  [[ "$output" == *"reload ssh"* ]]
 }
 
 @test "every implemented unit has an assertion, an action and a description" {
@@ -65,7 +79,7 @@ IMPLEMENTED="deploy-user ufw-base fail2ban unattended-upgrades timezone locale t
 
 @test "managed-file units point at existing templates" {
   local u line tpl
-  for u in fail2ban unattended-upgrades journald-cap sysctl-baseline; do
+  for u in fail2ban unattended-upgrades journald-cap sysctl-baseline ssh-hardening; do
     line="$(unit_managed_file "$u")"
     tpl="$(printf '%s' "$line" | cut -f2)"
     [ -n "$tpl" ]

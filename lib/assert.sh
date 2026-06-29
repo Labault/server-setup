@@ -88,6 +88,18 @@ assert_github_known_hosts() {
   grep -q '^github.com ' /etc/ssh/ssh_known_hosts 2>/dev/null || return 1
 }
 
+assert_ssh_hardening() {
+  command -v sshd >/dev/null 2>&1 || return 1
+  [[ -f /etc/ssh/sshd_config.d/99-server-setup.conf ]] || return 1
+  # Assert the EFFECTIVE running config (sshd -T), not just the file on disk, so
+  # this stays true even if someone added an overriding drop-in later.
+  local cfg
+  cfg="$(sshd -T 2>/dev/null)" || return 1
+  grep -qi '^permitrootlogin no' <<<"$cfg" || return 1
+  grep -qi '^passwordauthentication no' <<<"$cfg" || return 1
+  grep -qi '^pubkeyauthentication yes' <<<"$cfg" || return 1
+}
+
 assert_sysctl_baseline() {
   local f=/etc/sysctl.d/99-server-setup.conf
   [[ -f "$f" ]] || return 1
@@ -118,6 +130,7 @@ assert_unit() {
   journald-cap) assert_journald_cap ;;
   github-known-hosts) assert_github_known_hosts ;;
   sysctl-baseline) assert_sysctl_baseline ;;
+  ssh-hardening) assert_ssh_hardening ;;
   *) die "Unknown unit (no assertion): $1" ;;
   esac
 }

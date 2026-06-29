@@ -14,14 +14,15 @@ source "$SERVER_ROOT/lib/assert.sh"
 source "$SERVER_ROOT/lib/backup.sh"
 # shellcheck source=lib/state.sh
 source "$SERVER_ROOT/lib/state.sh"
+# shellcheck source=lib/deadman.sh
+source "$SERVER_ROOT/lib/deadman.sh"
 # shellcheck source=lib/manifest.sh
 source "$SERVER_ROOT/lib/manifest.sh"
 
-# Units declared by a profile but not yet implemented here. ssh-hardening (the
-# root-off / password-off cutover, unit 12) is the dangerous gesture, isolated
-# to the SSH-cutover step (Prompt 3): we list it so the profile stays honest
-# about the full desired state, but the loop refuses to touch it for now.
-DEFERRED_UNITS=" ssh-hardening "
+# Units a profile declares but the engine deliberately skips. Empty now that the
+# SSH cutover (unit 12) is implemented behind its anti-lockout sequence; kept as
+# a mechanism for any future not-yet-built unit.
+DEFERRED_UNITS=""
 
 # ---------------------------------------------------------------------------
 # File / package helpers
@@ -102,6 +103,7 @@ unit_managed_file() {
   unattended-upgrades) printf '%s\t%s\n' "/etc/apt/apt.conf.d/52-server-setup.conf" "$SERVER_ROOT/templates/unattended/52-server-setup.conf" ;;
   journald-cap) printf '%s\t%s\n' "/etc/systemd/journald.conf.d/99-server-setup.conf" "$SERVER_ROOT/templates/journald/99-server-setup.conf" ;;
   sysctl-baseline) printf '%s\t%s\n' "/etc/sysctl.d/99-server-setup.conf" "$(sysctl_template)" ;;
+  ssh-hardening) printf '%s\t%s\n' "/etc/ssh/sshd_config.d/99-server-setup.conf" "$SERVER_ROOT/templates/ssh/99-server-setup.conf" ;;
   *) : ;;
   esac
 }
@@ -126,6 +128,7 @@ unit_describe() {
       printf 'empty sysctl baseline (pass --paranoid to harden)'
     fi
     ;;
+  ssh-hardening) printf 'disable root + password SSH login (anti-lockout cutover)' ;;
   *) printf '?' ;;
   esac
 }
@@ -290,6 +293,176 @@ do_sysctl_baseline() {
   fi
 }
 
+# --- SSH cutover (unit 12) — the dangerous gesture, §9.4 -------------------
+
+# sshd_live_permissive -> true when the CURRENTLY running sshd still allows root
+# login or password auth, i.e. this cutover is genuinely restrictive and must be
+# protected by the dead-man's switch. If we can't read the live config, assume
+# permissive (arm, to be safe). Drives the conditional-arming rule (§11.2).
+sshd_live_permissive() {
+  local cfg
+  cfg="$(sshd -T 2>/dev/null)" || return 0
+  grep -qi '^passwordauthentication yes' <<<"$cfg" && return 0
+  grep -qiE '^permitrootlogin (yes|prohibit-password|without-password|forced-commands-only)' <<<"$cfg" && return 0
+  return 1
+}
+
+# ssh_restore_dropin <dropin> <prev-snapshot-or-empty> -> put the drop-in back to
+# its pre-cutover state (restore the snapshot, or remove it if there was none).
+ssh_restore_dropin() {
+  local dropin="$1" prev="$2"
+  if [[ -n "$prev" && -f "$prev" ]]; then
+    cp -a -- "$prev" "$dropin"
+  else
+    rm -f -- "$dropin"
+  fi
+}
+
+# ssh_self_test <dropin> -> stand up a throwaway sshd on the loopback, bound to a
+# high port, that Includes the candidate drop-in, and prove a KEY login passes
+# under it (pubkey accepted, password/root off don't block a key). Uses an
+# ephemeral keypair and host key; touches neither the live sshd nor real keys.
+# Returns 0 if the key login succeeds, non-zero otherwise.
+ssh_self_test() {
+  local dropin="$1"
+  local sshd_bin tmp rc=1 pid i port="" p
+  sshd_bin="$(command -v sshd || printf '/usr/sbin/sshd')"
+  tmp="$(mktemp -d)"
+  # sshd, after privsep, reads AuthorizedKeysFile AS the target user, so the temp
+  # dir and key file must be traversable/readable by deploy (mktemp -d is 0700).
+  chmod 0755 "$tmp"
+
+  # Pick a free loopback port rather than a hardcoded one, so we never connect to
+  # something else already listening (which would give a false self-test result).
+  for p in 53122 53123 53124 53125 53126 53127; do
+    if ! ss -ltn 2>/dev/null | grep -q ":${p} "; then
+      port="$p"
+      break
+    fi
+  done
+  [[ -n "$port" ]] || {
+    rm -rf "$tmp"
+    return 1
+  }
+
+  ssh-keygen -q -t ed25519 -f "$tmp/hostkey" -N '' || {
+    rm -rf "$tmp"
+    return 1
+  }
+  ssh-keygen -q -t ed25519 -f "$tmp/userkey" -N '' || {
+    rm -rf "$tmp"
+    return 1
+  }
+  cp "$tmp/userkey.pub" "$tmp/authorized_keys"
+  chmod 0644 "$tmp/authorized_keys"
+
+  # UsePAM yes mirrors the real Ubuntu sshd: the deploy user has a locked
+  # password (no password login), which PAM still lets log in by key — exactly
+  # the production setup. With UsePAM no, sshd would reject the locked account
+  # and the self-test would be a false negative.
+  cat >"$tmp/sshd_config" <<EOF
+Port $port
+ListenAddress 127.0.0.1
+HostKey $tmp/hostkey
+PidFile $tmp/sshd.pid
+AuthorizedKeysFile $tmp/authorized_keys
+UsePAM yes
+StrictModes no
+Include $dropin
+EOF
+
+  if ! "$sshd_bin" -t -f "$tmp/sshd_config" 2>/dev/null; then
+    rm -rf "$tmp"
+    return 1
+  fi
+
+  "$sshd_bin" -f "$tmp/sshd_config" -D -E "$tmp/sshd.log" &
+  pid=$!
+  for ((i = 0; i < 40; i++)); do
+    if ss -ltn 2>/dev/null | grep -q "127.0.0.1:$port"; then break; fi
+    sleep 0.25
+  done
+
+  if ssh -i "$tmp/userkey" -p "$port" \
+    -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    -o BatchMode=yes -o ConnectTimeout=5 \
+    "${DEPLOY_USER}@127.0.0.1" true 2>/dev/null; then
+    rc=0
+  fi
+
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  rm -rf "$tmp"
+  return "$rc"
+}
+
+# do_ssh_hardening -> the §9.4 cutover, in order:
+#   1. write the candidate drop-in, then `sshd -t` on the MERGED config; abort
+#      before any reload if it's invalid.
+#   2. loopback key self-test under the new config; abort before reload on fail.
+#   3. arm the dead-man's switch (only if the change is really restrictive) and
+#      flag state as pending-confirmation.
+#   4. `systemctl reload ssh` — never restart.
+#   5. print the reconnect/confirm instruction (incl. the reboot-edge warning).
+do_ssh_hardening() {
+  local tpl="$SERVER_ROOT/templates/ssh/99-server-setup.conf"
+  local dropin=/etc/ssh/sshd_config.d/99-server-setup.conf
+  ensure_pkg openssh-server
+  command -v ssh >/dev/null 2>&1 || ensure_pkg openssh-client
+  # Privilege-separation dir: `sshd -t` (and the self-test's throwaway sshd)
+  # refuse to run without it. It normally exists because sshd is running, but
+  # create it defensively so validation works even if /run was just cleaned.
+  [[ -d /run/sshd ]] || mkdir -p /run/sshd
+
+  # Arming gate (§11.2): only arm when we're actually disabling something the
+  # live config still permits. Computed BEFORE we touch the drop-in.
+  local arm=0
+  sshd_live_permissive && arm=1
+
+  # Snapshot the previous drop-in for rollback (empty => it didn't exist).
+  local prev=""
+  if [[ -f "$dropin" ]]; then
+    mkdir -p "$STATE_DIR"
+    prev="$STATE_DIR/ssh-rollback.prev"
+    cp -a -- "$dropin" "$prev"
+  fi
+
+  # Step 1: candidate drop-in + validate the merged config.
+  install_managed_file "$tpl" "$dropin" 0644
+  if ! sshd -t 2>/dev/null; then
+    log_error "sshd -t failed on the merged config — aborting BEFORE any reload"
+    ssh_restore_dropin "$dropin" "$prev"
+    return 1
+  fi
+
+  # Step 2: loopback key self-test.
+  if ! ssh_self_test "$dropin"; then
+    log_error "loopback key self-test failed under the new SSH config — aborting before reload"
+    ssh_restore_dropin "$dropin" "$prev"
+    return 1
+  fi
+
+  # Step 3: arm (conditional) + flag pending-confirmation.
+  local window="${SERVER_DEADMAN_WINDOW:-$DEADMAN_WINDOW_DEFAULT}"
+  if [[ "$arm" == 1 ]]; then
+    deadman_arm "$dropin" "$prev" "$window"
+    PENDING_CONFIRMATION=1
+  else
+    log_info "SSH already non-permissive — applying the drop-in without arming the dead-man's switch"
+  fi
+
+  # Step 4: reload, NEVER restart (a restart kills established sessions, §9.4/D9).
+  systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null ||
+    die "failed to reload ssh"
+
+  # Step 5: the instruction.
+  if [[ "$arm" == 1 ]]; then
+    log_warn "SSH hardened: root login OFF, password auth OFF. Anti-lockout armed for ${window}."
+    log_warn "Reconnect as '${DEPLOY_USER}' by key and run 'server confirm' within ${window}, or SSH ROLLS BACK automatically."
+    log_warn "A reboot during the window loses the timer — CONFIRM BEFORE ANY REBOOT."
+  fi
+}
+
 # do_unit <unit id> -> dispatch to the action above.
 do_unit() {
   case "$1" in
@@ -304,6 +477,7 @@ do_unit() {
   journald-cap) do_journald_cap ;;
   github-known-hosts) do_github_known_hosts ;;
   sysctl-baseline) do_sysctl_baseline ;;
+  ssh-hardening) do_ssh_hardening ;;
   *) die "Unknown unit (no action): $1" ;;
   esac
 }
@@ -339,6 +513,9 @@ converge_profile() {
 
   STATE_FILES=()
   STATE_ASSERTIONS=()
+  # Set to 1 by the SSH cutover when it arms the dead-man's switch; it makes the
+  # state record confirm_state: pending-confirmation until `server confirm`.
+  PENDING_CONFIRMATION=0
   local status converged=0 skipped=0 failed=0 deferred=0
 
   for u in "${units_arr[@]}"; do
@@ -386,8 +563,11 @@ converge_profile() {
     return 0
   fi
 
-  # No SSH cutover happens in this step, so there is nothing pending to confirm.
-  write_server_state "$profile" "confirmed"
+  # pending-confirmation while the dead-man's switch is armed (SSH cutover),
+  # otherwise confirmed — there is nothing left to confirm.
+  local confirm="confirmed"
+  [[ "$PENDING_CONFIRMATION" == 1 ]] && confirm="pending-confirmation"
+  write_server_state "$profile" "$confirm"
   log_ok "state written: ${STATE_FILE} (${converged} converged, ${skipped} already-ok, ${failed} failed, ${deferred} deferred)"
   [[ "$failed" -eq 0 ]]
 }

@@ -62,3 +62,14 @@ write_server_state() {
 
   mv "$tmp" "$STATE_FILE"
 }
+
+# state_set_confirm_state <value> -> rewrite just the confirm_state line of an
+# existing state file (used by `server confirm`). Atomic; leaves everything else
+# untouched. Values: pending-confirmation | confirmed.
+state_set_confirm_state() {
+  local value="$1" tmp
+  [[ -f "$STATE_FILE" ]] || die "state file not found: ${STATE_FILE}"
+  tmp="$(mktemp "$STATE_DIR/state.yaml.XXXXXX")" || die "cannot write state in ${STATE_DIR}"
+  sed "s/^confirm_state:.*/confirm_state: ${value}/" "$STATE_FILE" >"$tmp"
+  mv "$tmp" "$STATE_FILE"
+}
