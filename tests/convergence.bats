@@ -142,6 +142,31 @@ setup() {
   [ "$status" -ne 0 ]
 }
 
+@test "merge_authorized_keys appends, dedups whole lines and strips blanks" {
+  local existing="$BATS_TEST_TMPDIR/existing" src="$BATS_TEST_TMPDIR/admins.pub"
+  printf 'ssh-ed25519 AAAAroot root@box\n' >"$existing"
+  # The admin file repeats root's key (must dedup), adds a new one, and has a
+  # blank line (must be stripped).
+  printf 'ssh-ed25519 AAAAroot root@box\n\nssh-ed25519 AAAAadmin admin@laptop\n' >"$src"
+
+  run merge_authorized_keys "$existing" "$src"
+  [ "$status" -eq 0 ]
+  # Existing key first, the new one appended, each exactly once, no blank line.
+  [ "${#lines[@]}" -eq 2 ]
+  [ "${lines[0]}" = "ssh-ed25519 AAAAroot root@box" ]
+  [ "${lines[1]}" = "ssh-ed25519 AAAAadmin admin@laptop" ]
+}
+
+@test "merge_authorized_keys works when deploy has no keys yet (src only)" {
+  local src="$BATS_TEST_TMPDIR/admins.pub"
+  printf 'ssh-ed25519 AAAAadmin admin@laptop\nssh-ed25519 AAAAadmin admin@laptop\n' >"$src"
+  # A missing/empty existing file must not error and must still dedup the source.
+  run merge_authorized_keys "$BATS_TEST_TMPDIR/nope" "$src"
+  [ "$status" -eq 0 ]
+  [ "${#lines[@]}" -eq 1 ]
+  [ "${lines[0]}" = "ssh-ed25519 AAAAadmin admin@laptop" ]
+}
+
 @test "friday_wink quacks when forced and never blocks (D14)" {
   SERVER_FORCE_FRIDAY=1
   run friday_wink

@@ -37,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `server setup --authorized-keys <file>` seeds the `deploy` user from an explicit
+  file of admin public keys (one per line), appended and deduped (`0600`, owner
+  `deploy`). It decouples `deploy` from whatever key root happened to have, and is
+  what lets the SSH cutover pass its key gate without root owning a key. Without
+  the flag, behaviour is unchanged: `deploy` inherits root's incoming key. A bad
+  path fails fast, before any mutation. Proven by `merge_authorized_keys` unit
+  tests and validation case `54-authorized-keys-seed`.
 - Validation case `03b-deadman-rollback`: an in-container acceptance test that
   arms a short dead-man's window, deliberately doesn't confirm, and proves the
   timer FIRES and restores the pre-cutover SSH state (DoD #5). Closes the gap

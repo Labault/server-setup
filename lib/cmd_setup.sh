@@ -17,6 +17,7 @@ cmd_setup() {
   PARANOID=0
   NO_OVERWRITE=0
   ALLOW_KEYLESS_SSH_CUTOVER=0
+  ADMIN_KEYS_FILE=""
   local skip_bin_check=0
 
   while [[ $# -gt 0 ]]; do
@@ -34,6 +35,12 @@ cmd_setup() {
       ;;
     --timezone=*) DESIRED_TIMEZONE="${1#*=}" ;;
     --paranoid) PARANOID=1 ;;
+    --authorized-keys)
+      [[ $# -ge 2 ]] || die "--authorized-keys requires a file path"
+      ADMIN_KEYS_FILE="$2"
+      shift
+      ;;
+    --authorized-keys=*) ADMIN_KEYS_FILE="${1#*=}" ;;
     --allow-keyless-ssh-cutover) ALLOW_KEYLESS_SSH_CUTOVER=1 ;;
     --skip-bin-check) skip_bin_check=1 ;;
     --no-overwrite) NO_OVERWRITE=1 ;;
@@ -48,6 +55,11 @@ Options:
   --profile <p>     Required. Which profile to converge (minimal|docker|web).
   --timezone <tz>   Timezone to set (default: UTC).
   --paranoid        Enable the sysctl network-hardening baseline (D6).
+  --authorized-keys <file>
+                    Seed the deploy user with the admin public key(s) in <file>
+                    (one per line), appended and deduped. Decouples deploy from
+                    whatever /root had; this is what lets the SSH cutover pass
+                    its key gate. Without it, deploy inherits root's key (§10.4).
   --allow-keyless-ssh-cutover
                     Crowbar: proceed with the key-only SSH cutover even if the
                     deploy user has no authorized_keys. Use ONLY when the key
@@ -65,6 +77,13 @@ EOF
 
   # --profile is mandatory and explicit: no silent default, no `detect` (A1).
   [[ -n "$profile" ]] || die "--profile is required (minimal|docker|web). There is no default."
+
+  # If admin keys were given, fail fast on a bad path BEFORE any mutation (and
+  # even under --dry-run): an unreadable or empty key file is a typo, not a key.
+  if [[ -n "$ADMIN_KEYS_FILE" ]]; then
+    [[ -r "$ADMIN_KEYS_FILE" ]] || die "--authorized-keys: cannot read ${ADMIN_KEYS_FILE}"
+    [[ -s "$ADMIN_KEYS_FILE" ]] || die "--authorized-keys: ${ADMIN_KEYS_FILE} is empty"
+  fi
 
   friday_wink # D14: non-blocking; the duck never bars the road.
 

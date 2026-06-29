@@ -132,7 +132,7 @@ Pour chaque unité : ce qu'elle fait, le **fichier managé** déposé (le cas é
 
 |#|Unité|Fichier managé / Assertion|Profil|
 |---|---|---|---|
-|1|**User `deploy`**|user non-root, dans `sudo`, `NOPASSWD` validé par `visudo -cf`, `authorized_keys` semée depuis la clé root entrante|`minimal`|
+|1|**User `deploy`**|user non-root, dans `sudo`, `NOPASSWD` validé par `visudo -cf`, `authorized_keys` semée depuis `--authorized-keys` ou, à défaut, la clé root entrante|`minimal`|
 |2|**ufw deny-by-default + SSH**|`ufw default deny incoming` / `allow out` + `allow 22` ; activé **après** la règle SSH (anti-lockout, §9.3)|`minimal`|
 |3|**fail2ban**|jail `sshd` (seuils chiffrés au §10.5)|`minimal`|
 |4|**unattended-upgrades**|MAJ sécurité auto + reboot auto **04:00**|`minimal`|
@@ -354,7 +354,9 @@ Rotation des logs obligatoire (`log-driver: json-file`, `log-opts` max-size / ma
 
 ### 10.4 User `deploy`
 
-Non-root, shell `/bin/bash`, dans le groupe `sudo`, ligne `NOPASSWD` dans `/etc/sudoers.d/` **validée par `visudo -cf`** avant installation (décision durcie : jamais un sudoers cassé qui te bloque). `authorized_keys` semée depuis la clé root entrante. Sur profil `docker`, ajouté au groupe `docker`.
+Non-root, shell `/bin/bash`, dans le groupe `sudo`, ligne `NOPASSWD` dans `/etc/sudoers.d/` **validée par `visudo -cf`** avant installation (décision durcie : jamais un sudoers cassé qui te bloque). Sur profil `docker`, ajouté au groupe `docker`.
+
+**`authorized_keys`, deux sources, par priorité :** si `--authorized-keys <fichier>` est fourni (un fichier de clés publiques, une par ligne), ces clés sont semées dans l'`authorized_keys` de `deploy` (**append + dédup**, `0600`, owner `deploy`). Cela **découple `deploy` de « ce que root avait »** et c'est ce qui fait passer la garde du cutover (§9.4) sans que root ait besoin d'une clé. À défaut d'option, repli sur le comportement historique : la clé root entrante (`/root/.ssh/authorized_keys`) est recopiée, best-effort ; si root n'en a pas, on **prévient** (warning) sans échouer, le pan structurel de l'unité tenant quand même.
 
 ### 10.5 fail2ban, unattended-upgrades, swap, journald, sysctl
 

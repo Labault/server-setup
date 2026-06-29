@@ -69,7 +69,15 @@ server setup --profile web --dry-run
 
 # Converge for real. The SSH cutover arms a 10-minute rollback (see Gotchas).
 server setup --profile web
+
+# Or seed the deploy user from your own admin key(s) instead of root's:
+server setup --profile web --authorized-keys /root/admins.pub
 ```
+
+`--authorized-keys <file>` takes a file of public keys (one per line) and seeds
+them into the `deploy` user, appended and deduped. It decouples `deploy` from
+whatever key root happened to have, and it's what lets the SSH cutover pass its
+key gate. Without it, `deploy` inherits root's incoming key (the old behaviour).
 
 Then reconnect **as the `deploy` user by key** and lock it in:
 
@@ -117,8 +125,9 @@ Four things will bite you if you don't know them. They're by design.
 4. **No key, no cutover.** The cutover refuses up front if the `deploy` user has no
    `authorized_keys`: key-only SSH with no key is a guaranteed lockout, and the
    dead-man's switch is a poor net for a problem you can see coming. `deploy`
-   normally inherits root's incoming key during convergence; if you're seeding the
-   key out-of-band, force it with `--allow-keyless-ssh-cutover` (the crowbar, and it
+   normally inherits root's incoming key during convergence, or you hand it in
+   explicitly with `--authorized-keys <file>`; if you're seeding the key
+   out-of-band, force it with `--allow-keyless-ssh-cutover` (the crowbar, and it
    looks like one on purpose).
 
 ## Testing & proof

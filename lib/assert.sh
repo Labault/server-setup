@@ -23,8 +23,8 @@ assert_deploy_user() {
   id -nG "$DEPLOY_USER" 2>/dev/null | tr ' ' '\n' | grep -qx sudo || return 1
   [[ -f "$DEPLOY_SUDOERS" ]] || return 1
   # NOPASSWD present means the validated sudoers we install is in place. The
-  # authorized_keys seed is best-effort (depends on root having a key) and is
-  # intentionally NOT part of this predicate, so idempotence holds on a box
+  # authorized_keys seed (from --authorized-keys, or best-effort from root's key)
+  # is intentionally NOT part of this predicate, so idempotence holds on a box
   # whose root has no key yet (e.g. a CI container) — see do_deploy_user.
   grep -q 'NOPASSWD' "$DEPLOY_SUDOERS" 2>/dev/null || return 1
 }

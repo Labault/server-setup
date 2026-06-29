@@ -169,22 +169,58 @@ do_deploy_user() {
   seed_deploy_authorized_keys "$user"
 }
 
-# Best-effort: copy root's incoming authorized_keys to the deploy user so you
-# can reconnect as deploy after the (later) SSH cutover. If root has no key,
-# warn loudly rather than fail — the structural part of the unit still holds.
+# Seed the deploy user's authorized_keys so you can reconnect as deploy after the
+# (later) SSH cutover. Two sources, in priority order:
+#   1. --authorized-keys (ADMIN_KEYS_FILE): explicit admin key(s), appended and
+#      deduped. This decouples deploy from "whatever root happened to have" and
+#      is what lets the cutover pass its key gate without root owning a key.
+#   2. Fallback (no --authorized-keys): copy root's incoming key, best-effort. If
+#      root has none either, warn loudly rather than fail — the structural part of
+#      the unit still holds.
 seed_deploy_authorized_keys() {
   local user="$1" home ssh_dir ak root_ak="/root/.ssh/authorized_keys"
   home="$(getent passwd "$user" | cut -d: -f6)"
   ssh_dir="$home/.ssh"
   ak="$ssh_dir/authorized_keys"
   install -d -m 0700 -o "$user" -g "$user" "$ssh_dir"
+
+  # Priority: explicit admin keys. Always (re-)merge so re-running stays a no-op
+  # in content; dedup keeps it idempotent even if deploy already had the key.
+  if [[ -n "${ADMIN_KEYS_FILE:-}" ]]; then
+    seed_keys_from_file "$user" "$ak" "$ADMIN_KEYS_FILE"
+    return 0
+  fi
+
   if [[ -s "$ak" ]]; then
     return 0
   fi
   if [[ -s "$root_ak" ]]; then
     install -m 0600 -o "$user" -g "$user" "$root_ak" "$ak"
   else
-    log_warn "root has no authorized_keys to seed for ${user} — add one before the SSH cutover (Prompt 3)"
+    log_warn "root has no authorized_keys to seed for ${user} — add one before the SSH cutover, or pass --authorized-keys <file>"
+  fi
+}
+
+# Append the public keys from <src> into <ak> (deploy's authorized_keys), then
+# install the result 0600, owner deploy. Existing keys are preserved; the merge
+# below dedups whole lines, so this is safe to re-run.
+seed_keys_from_file() {
+  local user="$1" ak="$2" src="$3" tmp
+  tmp="$(mktemp)"
+  merge_authorized_keys "$ak" "$src" >"$tmp"
+  install -m 0600 -o "$user" -g "$user" "$tmp" "$ak"
+  rm -f "$tmp"
+}
+
+# merge_authorized_keys <existing> <src> -> deduped, blank-stripped keys on
+# stdout, existing keys first then the new ones. Pure (no writes, no ownership)
+# so it's unit-testable; the caller handles placement, mode and ownership.
+merge_authorized_keys() {
+  local existing="$1" src="$2"
+  if [[ -s "$existing" ]]; then
+    awk 'NF && !seen[$0]++' "$existing" "$src"
+  else
+    awk 'NF && !seen[$0]++' "$src"
   fi
 }
 
@@ -434,8 +470,8 @@ do_ssh_hardening() {
   # out-of-band (you own the lockout risk then).
   if [[ "${ALLOW_KEYLESS_SSH_CUTOVER:-0}" != 1 ]] && ! deploy_has_authorized_key; then
     die "refusing the SSH cutover: ${DEPLOY_USER} has no authorized_keys — key-only SSH would lock you out.
-  Fix it first: seed a key for ${DEPLOY_USER} (add one to /root/.ssh/authorized_keys, then re-run setup,
-  or once --authorized-keys lands, pass it explicitly). If the key arrives out-of-band and you accept
+  Fix it first: seed a key for ${DEPLOY_USER} — pass --authorized-keys <file> with your admin public key(s),
+  or add one to /root/.ssh/authorized_keys — then re-run setup. If the key arrives out-of-band and you accept
   the lockout risk, re-run with --allow-keyless-ssh-cutover."
   fi
 
@@ -606,6 +642,16 @@ record_managed_file() {
   STATE_FILES+=("$dest"$'\t'"$sha"$'\t'"$tpl_sha")
 }
 
+# force_action <unit id> -> 0 when the unit's action must run even though its
+# assertion already passes. The desired-state loop normally skips a satisfied
+# unit; the one exception is an explicit --authorized-keys request, whose key
+# seed is deliberately NOT part of assert_deploy_user (it must stay idempotent on
+# a keyless box, e.g. CI). do_deploy_user is itself idempotent, so re-running it
+# to (re-)seed the admin key(s) is safe.
+force_action() {
+  [[ "$1" == deploy-user && -n "${ADMIN_KEYS_FILE:-}" ]]
+}
+
 # converge_profile <profile> -> run the loop over the profile's resolved units.
 # In --dry-run it only evaluates assertions and prints the plan (no mutation, no
 # state write). On a real run it acts on drift and writes state.yaml.
@@ -632,7 +678,7 @@ converge_profile() {
       continue
     fi
 
-    if assert_unit "$u"; then
+    if assert_unit "$u" && ! force_action "$u"; then
       log_ok "ok: ${u}$(is_dry_run && printf ' (already satisfied)')"
       status=pass
       skipped=$((skipped + 1))
