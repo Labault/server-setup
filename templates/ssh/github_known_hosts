@@ -1,0 +1,8 @@
+# GitHub's published SSH host key — pinned, NOT trust-on-first-use (D7, §11.4).
+# Seeded into /etc/ssh/ssh_known_hosts so later app-repo pulls (done by
+# push-to-deploy's webhook) verify github.com against a known key instead of
+# blindly accepting whatever answers. Source, to refresh if GitHub rotates:
+#   https://docs.github.com/.../githubs-ssh-key-fingerprints
+# We pin the Ed25519 key only: it's GitHub's preferred algorithm and what a
+# modern OpenSSH client negotiates first, so one correct line is enough.
+github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl

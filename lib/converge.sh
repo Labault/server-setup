@@ -1,0 +1,393 @@
+# shellcheck shell=bash
+# The convergence engine (§9.3): for each unit of the resolved profile, evaluate
+# its assertion -> if satisfied, skip (idempotence) -> otherwise act -> re-assert
+# to confirm. Managed files go through backup_file before being overwritten and
+# are hashed into state.yaml; every unit records its assertion (id + status).
+#
+# This file also holds the per-unit ACTIONS (do_*). Predicates live in assert.sh
+# (the shared source of truth); a new unit type = a new predicate there + a new
+# action here (CDC §7).
+
+# shellcheck source=lib/assert.sh
+source "$SERVER_ROOT/lib/assert.sh"
+# shellcheck source=lib/backup.sh
+source "$SERVER_ROOT/lib/backup.sh"
+# shellcheck source=lib/state.sh
+source "$SERVER_ROOT/lib/state.sh"
+# shellcheck source=lib/manifest.sh
+source "$SERVER_ROOT/lib/manifest.sh"
+
+# Units declared by a profile but not yet implemented here. ssh-hardening (the
+# root-off / password-off cutover, unit 12) is the dangerous gesture, isolated
+# to the SSH-cutover step (Prompt 3): we list it so the profile stays honest
+# about the full desired state, but the loop refuses to touch it for now.
+DEFERRED_UNITS=" ssh-hardening "
+
+# ---------------------------------------------------------------------------
+# File / package helpers
+# ---------------------------------------------------------------------------
+
+# Run apt-get update at most once per converge, lazily (only when a package is
+# actually missing).
+APT_UPDATED=0
+ensure_pkg() {
+  local pkg="$1"
+  dpkg -s "$pkg" >/dev/null 2>&1 && return 0
+  if [[ "$APT_UPDATED" == 0 ]]; then
+    log_info "apt-get update…"
+    DEBIAN_FRONTEND=noninteractive apt-get update -qq || die "apt-get update failed"
+    APT_UPDATED=1
+  fi
+  log_info "installing ${pkg}…"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$pkg" || die "failed to install ${pkg}"
+}
+
+# install_managed_file <tpl-src> <dest> [mode] -> deposit a template at an
+# absolute dest, backing up any DIFFERING existing file first. Idempotent: an
+# identical file is left untouched (no backup, no rewrite).
+install_managed_file() {
+  local src="$1" dest="$2" mode="${3:-0644}" bak
+  if [[ -f "$dest" ]] && cmp -s "$src" "$dest"; then
+    return 0
+  fi
+  if [[ "${NO_OVERWRITE:-0}" == 1 && -e "$dest" ]]; then
+    log_warn "skip ${dest} (--no-overwrite)"
+    return 0
+  fi
+  bak="$(backup_file "$dest")"
+  [[ -n "$bak" ]] && log_info "backed up $(tildify "$dest") -> ${bak}"
+  mkdir -p "$(dirname "$dest")"
+  install -m "$mode" "$src" "$dest"
+}
+
+# write_managed_file <dest> <mode> -> deposit generated content (read from
+# stdin) at dest, with the same backup + idempotence semantics.
+write_managed_file() {
+  local dest="$1" mode="${2:-0644}" tmp bak
+  tmp="$(mktemp)"
+  cat >"$tmp"
+  if [[ -f "$dest" ]] && cmp -s "$tmp" "$dest"; then
+    rm -f "$tmp"
+    return 0
+  fi
+  if [[ "${NO_OVERWRITE:-0}" == 1 && -e "$dest" ]]; then
+    rm -f "$tmp"
+    log_warn "skip ${dest} (--no-overwrite)"
+    return 0
+  fi
+  bak="$(backup_file "$dest")"
+  [[ -n "$bak" ]] && log_info "backed up $(tildify "$dest") -> ${bak}"
+  mkdir -p "$(dirname "$dest")"
+  install -m "$mode" "$tmp" "$dest"
+  rm -f "$tmp"
+}
+
+# sysctl_template -> path of the sysctl drop-in to deposit (empty baseline by
+# default, hardening variant under --paranoid). Used by both the action and the
+# state writer so the recorded tpl_sha256 matches what was deposited.
+sysctl_template() {
+  if [[ "${PARANOID:-0}" == 1 ]]; then
+    printf '%s\n' "$SERVER_ROOT/templates/sysctl/99-server-setup.paranoid.conf"
+  else
+    printf '%s\n' "$SERVER_ROOT/templates/sysctl/99-server-setup.conf"
+  fi
+}
+
+# unit_managed_file <unit id> -> "dest<TAB>tpl-src" for units that own a managed
+# file (recorded in state.yaml's files[]), empty for assertion-only units.
+unit_managed_file() {
+  case "$1" in
+  deploy-user) printf '%s\t%s\n' "$DEPLOY_SUDOERS" "" ;;
+  fail2ban) printf '%s\t%s\n' "/etc/fail2ban/jail.local" "$SERVER_ROOT/templates/fail2ban/jail.local" ;;
+  unattended-upgrades) printf '%s\t%s\n' "/etc/apt/apt.conf.d/52-server-setup.conf" "$SERVER_ROOT/templates/unattended/52-server-setup.conf" ;;
+  journald-cap) printf '%s\t%s\n' "/etc/systemd/journald.conf.d/99-server-setup.conf" "$SERVER_ROOT/templates/journald/99-server-setup.conf" ;;
+  sysctl-baseline) printf '%s\t%s\n' "/etc/sysctl.d/99-server-setup.conf" "$(sysctl_template)" ;;
+  *) : ;;
+  esac
+}
+
+# unit_describe <unit id> -> one-line human description, for the --dry-run plan.
+unit_describe() {
+  case "$1" in
+  deploy-user) printf 'create non-root sudoer %s (NOPASSWD, visudo-validated) + seed its SSH key' "$DEPLOY_USER" ;;
+  ufw-base) printf 'ufw deny-incoming / allow-out, allow 22/tcp, then enable' ;;
+  fail2ban) printf 'install fail2ban + sshd jail' ;;
+  unattended-upgrades) printf 'auto security upgrades + auto-reboot 04:00' ;;
+  timezone) printf 'set timezone to %s' "${DESIRED_TIMEZONE:-UTC}" ;;
+  locale) printf 'generate + set en_US.UTF-8' ;;
+  timesync) printf 'enable systemd-timesyncd' ;;
+  swap) printf 'create %s (2G) + vm.swappiness=10' "$SWAP_FILE" ;;
+  journald-cap) printf 'cap journald SystemMaxUse' ;;
+  github-known-hosts) printf 'pin github.com host key into ssh_known_hosts' ;;
+  sysctl-baseline)
+    if [[ "${PARANOID:-0}" == 1 ]]; then
+      printf 'apply paranoid sysctl hardening'
+    else
+      printf 'empty sysctl baseline (pass --paranoid to harden)'
+    fi
+    ;;
+  *) printf '?' ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------
+# Per-unit actions (do_*). Each returns 0 on success, non-zero on failure.
+# ---------------------------------------------------------------------------
+
+do_deploy_user() {
+  local user="$DEPLOY_USER"
+  if ! id -u "$user" >/dev/null 2>&1; then
+    useradd -m -s /bin/bash "$user" || return 1
+  fi
+  usermod -aG sudo "$user" || return 1
+
+  # sudoers NOPASSWD, validated by `visudo -cf` BEFORE install (§10.4): never
+  # leave a broken sudoers that could lock you out of privilege escalation.
+  local tmp
+  tmp="$(mktemp)"
+  printf '%s ALL=(ALL) NOPASSWD:ALL\n' "$user" >"$tmp"
+  if ! visudo -cf "$tmp" >/dev/null 2>&1; then
+    rm -f "$tmp"
+    die "generated sudoers for ${user} failed visudo validation — refusing to install"
+  fi
+  if [[ ! -f "$DEPLOY_SUDOERS" ]] || ! cmp -s "$tmp" "$DEPLOY_SUDOERS"; then
+    backup_file "$DEPLOY_SUDOERS" >/dev/null
+    install -m 0440 "$tmp" "$DEPLOY_SUDOERS"
+  fi
+  rm -f "$tmp"
+
+  seed_deploy_authorized_keys "$user"
+}
+
+# Best-effort: copy root's incoming authorized_keys to the deploy user so you
+# can reconnect as deploy after the (later) SSH cutover. If root has no key,
+# warn loudly rather than fail — the structural part of the unit still holds.
+seed_deploy_authorized_keys() {
+  local user="$1" home ssh_dir ak root_ak="/root/.ssh/authorized_keys"
+  home="$(getent passwd "$user" | cut -d: -f6)"
+  ssh_dir="$home/.ssh"
+  ak="$ssh_dir/authorized_keys"
+  install -d -m 0700 -o "$user" -g "$user" "$ssh_dir"
+  if [[ -s "$ak" ]]; then
+    return 0
+  fi
+  if [[ -s "$root_ak" ]]; then
+    install -m 0600 -o "$user" -g "$user" "$root_ak" "$ak"
+  else
+    log_warn "root has no authorized_keys to seed for ${user} — add one before the SSH cutover (Prompt 3)"
+  fi
+}
+
+do_ufw_base() {
+  ensure_pkg ufw
+  # Order is vital (anti-lockout): set policy, ALLOW 22, and only THEN enable.
+  # Never enable a deny-incoming firewall before SSH is allowed.
+  ufw default deny incoming >/dev/null || return 1
+  ufw default allow outgoing >/dev/null || return 1
+  ufw allow 22/tcp >/dev/null || return 1
+  ufw --force enable >/dev/null || return 1
+}
+
+do_fail2ban() {
+  ensure_pkg fail2ban
+  install_managed_file "$SERVER_ROOT/templates/fail2ban/jail.local" /etc/fail2ban/jail.local
+  systemctl enable fail2ban >/dev/null 2>&1 || true
+  systemctl restart fail2ban || return 1
+  # fail2ban-server opens its socket a beat after the unit reports started; wait
+  # for it to answer so the immediate re-assert doesn't race a cold server.
+  local i
+  for ((i = 0; i < 30; i++)); do
+    fail2ban-client ping >/dev/null 2>&1 && break
+    sleep 0.5
+  done
+}
+
+do_unattended_upgrades() {
+  ensure_pkg unattended-upgrades
+  install_managed_file "$SERVER_ROOT/templates/unattended/52-server-setup.conf" \
+    /etc/apt/apt.conf.d/52-server-setup.conf
+  write_managed_file /etc/apt/apt.conf.d/20auto-upgrades 0644 <<'EOF'
+// Managed by server-setup.
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+EOF
+  systemctl enable unattended-upgrades >/dev/null 2>&1 || true
+}
+
+do_timezone() {
+  local tz="${DESIRED_TIMEZONE:-UTC}"
+  [[ -f "/usr/share/zoneinfo/$tz" ]] || die "unknown timezone: ${tz}"
+  timedatectl set-timezone "$tz" || return 1
+}
+
+do_locale() {
+  ensure_pkg locales
+  if ! locale -a 2>/dev/null | grep -qiE '^en_us\.utf-?8$'; then
+    sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen 2>/dev/null || true
+    grep -q '^en_US.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null ||
+      printf 'en_US.UTF-8 UTF-8\n' >>/etc/locale.gen
+    locale-gen >/dev/null || return 1
+  fi
+  update-locale LANG=en_US.UTF-8 || return 1
+}
+
+do_timesync() {
+  timedatectl set-ntp true >/dev/null 2>&1 || true
+  systemctl enable systemd-timesyncd >/dev/null 2>&1 || true
+  # Don't hard-fail on start: inside a container the unit is condition-skipped by
+  # design (the host keeps the clock). The re-assert decides what counts.
+  systemctl start systemd-timesyncd >/dev/null 2>&1 || true
+}
+
+do_swap() {
+  # Idempotent: only (re)create the swapfile when it's missing or the wrong
+  # size — never rewrite a healthy 2G swap for the fun of it (§4.3).
+  if ! swap_file_ready; then
+    swapoff "$SWAP_FILE" 2>/dev/null || true
+    rm -f "$SWAP_FILE"
+    if ! fallocate -l "$SWAP_SIZE_BYTES" "$SWAP_FILE" 2>/dev/null; then
+      dd if=/dev/zero of="$SWAP_FILE" bs=1M count=2048 status=none || return 1
+    fi
+    chmod 600 "$SWAP_FILE"
+    mkswap "$SWAP_FILE" >/dev/null || return 1
+    swapon "$SWAP_FILE" || return 1
+  fi
+  grep -qE "^${SWAP_FILE}[[:space:]]" /etc/fstab 2>/dev/null ||
+    printf '%s none swap sw 0 0\n' "$SWAP_FILE" >>/etc/fstab
+  write_managed_file /etc/sysctl.d/99-server-setup-swappiness.conf 0644 <<'EOF'
+# Managed by server-setup (swap unit).
+vm.swappiness=10
+EOF
+  sysctl -q -w vm.swappiness=10 || return 1
+}
+
+# swap_file_ready -> true when /swapfile exists at the right size and is active.
+swap_file_ready() {
+  [[ -f "$SWAP_FILE" ]] || return 1
+  [[ "$(stat -c %s "$SWAP_FILE" 2>/dev/null)" == "$SWAP_SIZE_BYTES" ]] || return 1
+  swapon --show=NAME --noheadings 2>/dev/null | grep -qx "$SWAP_FILE" || return 1
+}
+
+do_journald_cap() {
+  install_managed_file "$SERVER_ROOT/templates/journald/99-server-setup.conf" \
+    /etc/systemd/journald.conf.d/99-server-setup.conf
+  systemctl restart systemd-journald 2>/dev/null || true
+}
+
+do_github_known_hosts() {
+  local kh=/etc/ssh/ssh_known_hosts src="$SERVER_ROOT/templates/ssh/github_known_hosts"
+  mkdir -p /etc/ssh
+  if ! grep -q '^github.com ' "$kh" 2>/dev/null; then
+    backup_file "$kh" >/dev/null
+    grep -vE '^[[:space:]]*(#|$)' "$src" >>"$kh"
+  fi
+}
+
+do_sysctl_baseline() {
+  install_managed_file "$(sysctl_template)" /etc/sysctl.d/99-server-setup.conf
+  if [[ "${PARANOID:-0}" == 1 ]]; then
+    sysctl --system >/dev/null 2>&1 || true
+  fi
+}
+
+# do_unit <unit id> -> dispatch to the action above.
+do_unit() {
+  case "$1" in
+  deploy-user) do_deploy_user ;;
+  ufw-base) do_ufw_base ;;
+  fail2ban) do_fail2ban ;;
+  unattended-upgrades) do_unattended_upgrades ;;
+  timezone) do_timezone ;;
+  locale) do_locale ;;
+  timesync) do_timesync ;;
+  swap) do_swap ;;
+  journald-cap) do_journald_cap ;;
+  github-known-hosts) do_github_known_hosts ;;
+  sysctl-baseline) do_sysctl_baseline ;;
+  *) die "Unknown unit (no action): $1" ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------
+# The loop
+# ---------------------------------------------------------------------------
+
+# record_assertion <id> <status> -> append to the STATE_ASSERTIONS array.
+record_assertion() {
+  STATE_ASSERTIONS+=("$1"$'\t'"$2")
+}
+
+# record_managed_file <dest> <tpl-src> -> hash the on-disk file (and its
+# template, if any) and append to the STATE_FILES array.
+record_managed_file() {
+  local dest="$1" tpl="$2" sha tpl_sha=""
+  sha="$(file_sha256 "$dest")"
+  [[ -n "$tpl" && -f "$tpl" ]] && tpl_sha="$(file_sha256 "$tpl")"
+  STATE_FILES+=("$dest"$'\t'"$sha"$'\t'"$tpl_sha")
+}
+
+# converge_profile <profile> -> run the loop over the profile's resolved units.
+# In --dry-run it only evaluates assertions and prints the plan (no mutation, no
+# state write). On a real run it acts on drift and writes state.yaml.
+converge_profile() {
+  local profile="$1"
+  local -a units_arr=()
+  local u
+  while IFS= read -r u; do
+    [[ -n "$u" ]] && units_arr+=("$u")
+  done < <(resolve_units "$profile")
+
+  STATE_FILES=()
+  STATE_ASSERTIONS=()
+  local status converged=0 skipped=0 failed=0 deferred=0
+
+  for u in "${units_arr[@]}"; do
+    # Skip deferred units (ssh-hardening) entirely — declared, but not ours yet.
+    if [[ "$DEFERRED_UNITS" == *" $u "* ]]; then
+      log_warn "skip: ${u} — deferred to the SSH cutover (Prompt 3)"
+      deferred=$((deferred + 1))
+      continue
+    fi
+
+    if assert_unit "$u"; then
+      log_ok "ok: ${u}$(is_dry_run && printf ' (already satisfied)')"
+      status=pass
+      skipped=$((skipped + 1))
+    elif is_dry_run; then
+      log_dry "would converge: ${u} — $(unit_describe "$u")"
+      continue
+    else
+      log_info "converging: ${u}…"
+      if do_unit "$u" && assert_unit "$u"; then
+        log_ok "converged: ${u}"
+        status=pass
+        converged=$((converged + 1))
+      else
+        log_error "${u}: still not satisfied after action"
+        status=fail
+        failed=$((failed + 1))
+      fi
+    fi
+
+    # Record state for real runs only (dry-run writes nothing).
+    if ! is_dry_run; then
+      record_assertion "$u" "$status"
+      local mf dest tpl
+      mf="$(unit_managed_file "$u")"
+      if [[ -n "$mf" ]]; then
+        IFS=$'\t' read -r dest tpl <<<"$mf"
+        [[ -f "$dest" ]] && record_managed_file "$dest" "$tpl"
+      fi
+    fi
+  done
+
+  if is_dry_run; then
+    log_info "dry-run: ${#units_arr[@]} unit(s) evaluated, ${deferred} deferred. Nothing changed."
+    return 0
+  fi
+
+  # No SSH cutover happens in this step, so there is nothing pending to confirm.
+  write_server_state "$profile" "confirmed"
+  log_ok "state written: ${STATE_FILE} (${converged} converged, ${skipped} already-ok, ${failed} failed, ${deferred} deferred)"
+  [[ "$failed" -eq 0 ]]
+}
