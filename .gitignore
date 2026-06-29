@@ -3,6 +3,10 @@
 .env.*
 !.env.example
 *.local
+# templates/ holds managed SOURCE files, not local overrides — the fail2ban
+# template is literally named jail.local, so rescue it from the *.local rule
+# above (else it never gets committed and prod's /opt clone lacks it).
+!templates/fail2ban/jail.local
 
 # OS files
 .DS_Store

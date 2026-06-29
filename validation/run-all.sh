@@ -94,6 +94,12 @@ for dir in "${cases[@]}"; do
     mark="❌"
   fi
   printf '%-34s %s %s\n' "$name" "$mark" "$res"
+  # Surface a failing case's log inline so CI shows WHY without artifacts.
+  if [[ "$res" != PASS ]]; then
+    printf '%s\n' "----- $name/output.log -----"
+    sed 's/^/    /' "$dir/output.log" 2>/dev/null || true
+    printf '%s\n' "----------------------------"
+  fi
 done
 printf '%s\n' "------------------------------------------------"
 printf 'TOTAL: %s passed, %s failed\n\n' "$pass" "$fail"

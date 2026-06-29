@@ -1,0 +1,14 @@
+# Managed by server-setup — do not edit by hand (server setup overwrites it).
+# fail2ban sshd jail with concrete thresholds (CDC §10.5). The systemd backend
+# reads the journal, so no /var/log/auth.log dependency on modern Ubuntu.
+
+[DEFAULT]
+backend  = systemd
+bantime  = 1h
+findtime = 10m
+maxretry = 5
+
+[sshd]
+enabled  = true
+port     = ssh
+maxretry = 5
