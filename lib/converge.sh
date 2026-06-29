@@ -104,6 +104,7 @@ unit_managed_file() {
   journald-cap) printf '%s\t%s\n' "/etc/systemd/journald.conf.d/99-server-setup.conf" "$SERVER_ROOT/templates/journald/99-server-setup.conf" ;;
   sysctl-baseline) printf '%s\t%s\n' "/etc/sysctl.d/99-server-setup.conf" "$(sysctl_template)" ;;
   ssh-hardening) printf '%s\t%s\n' "/etc/ssh/sshd_config.d/99-server-setup.conf" "$SERVER_ROOT/templates/ssh/99-server-setup.conf" ;;
+  docker-daemon-json) printf '%s\t%s\n' "/etc/docker/daemon.json" "$SERVER_ROOT/templates/docker/daemon.json" ;;
   *) : ;;
   esac
 }
@@ -129,6 +130,12 @@ unit_describe() {
     fi
     ;;
   ssh-hardening) printf 'disable root + password SSH login (anti-lockout cutover)' ;;
+  docker-engine) printf 'install Docker Engine + compose plugin (official apt repo)' ;;
+  docker-daemon-json) printf 'write daemon.json with log rotation (the 16 GB lesson)' ;;
+  deploy-docker-group) printf 'add %s to the docker group' "$DEPLOY_USER" ;;
+  ufw-web) printf 'ufw allow 80/tcp + 443/tcp (firewall grows with the profile)' ;;
+  web-network) printf 'create the docker web network (idempotent, owned by server-setup)' ;;
+  ufw-docker-guard) printf 'assert no non-Caddy container publishes 80/443 (ufw×Docker footgun)' ;;
   *) printf '?' ;;
   esac
 }
@@ -463,6 +470,74 @@ do_ssh_hardening() {
   fi
 }
 
+# --- docker profile actions (units 13–15, CDC §6.2) ------------------------
+
+do_docker_engine() {
+  ensure_pkg ca-certificates
+  ensure_pkg curl
+  # Official Docker apt repo (the documented, supported install path).
+  install -m 0755 -d /etc/apt/keyrings
+  if [[ ! -f /etc/apt/keyrings/docker.asc ]]; then
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc ||
+      return 1
+    chmod a+r /etc/apt/keyrings/docker.asc
+  fi
+  local arch codename list want
+  arch="$(dpkg --print-architecture)"
+  codename="$(. /etc/os-release && printf '%s' "$VERSION_CODENAME")"
+  list=/etc/apt/sources.list.d/docker.list
+  want="deb [arch=${arch} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu ${codename} stable"
+  if [[ ! -f "$list" ]] || ! grep -qF "$want" "$list"; then
+    printf '%s\n' "$want" >"$list"
+    DEBIAN_FRONTEND=noninteractive apt-get update -qq || die "apt-get update failed (docker repo)"
+  fi
+  if ! dpkg -s docker-ce >/dev/null 2>&1; then
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+      docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin ||
+      return 1
+  fi
+  systemctl enable --now docker || return 1
+}
+
+do_docker_daemon_json() {
+  local f=/etc/docker/daemon.json src="$SERVER_ROOT/templates/docker/daemon.json" changed=0
+  if [[ ! -f "$f" ]] || ! cmp -s "$src" "$f"; then changed=1; fi
+  install_managed_file "$src" "$f"
+  # Apply the new daemon config only if it actually changed and docker is up.
+  if [[ "$changed" == 1 ]] && systemctl is-active --quiet docker 2>/dev/null; then
+    systemctl restart docker || return 1
+  fi
+}
+
+do_deploy_docker_group() {
+  getent group docker >/dev/null 2>&1 || return 1
+  # DEPLOY_USER is a module constant (assert.sh), never reassigned — the pipeline
+  # predicates that read it just confuse shellcheck's subshell heuristic.
+  # shellcheck disable=SC2031
+  usermod -aG docker "$DEPLOY_USER" || return 1
+}
+
+# --- web profile actions (units 16–18, CDC §6.3) ---------------------------
+
+do_ufw_web() {
+  # 80/443 are opened HERE and only here (D4). ufw is already active (ufw-base).
+  ufw allow 80/tcp >/dev/null || return 1
+  ufw allow 443/tcp >/dev/null || return 1
+}
+
+do_web_network() {
+  # server-setup owns the `web` network (D5): create idempotently, never delete.
+  docker network inspect web >/dev/null 2>&1 || docker network create web >/dev/null || return 1
+}
+
+do_ufw_docker_guard() {
+  # D8: we do NOT enable ufw-docker automatically (it's opt-in). Nothing to
+  # mutate at the doormat stage — the invariant holds because no app container
+  # exists yet. If a stray non-Caddy container ever publishes 80/443, the
+  # re-assert fails and a human fixes it; we won't kill someone's container.
+  log_info "ufw×Docker (D8): only the Caddy proxy should publish 80/443; keep app services on internal networks. ufw-docker stays opt-in — see docs/profiles/web."
+}
+
 # do_unit <unit id> -> dispatch to the action above.
 do_unit() {
   case "$1" in
@@ -478,6 +553,12 @@ do_unit() {
   github-known-hosts) do_github_known_hosts ;;
   sysctl-baseline) do_sysctl_baseline ;;
   ssh-hardening) do_ssh_hardening ;;
+  docker-engine) do_docker_engine ;;
+  docker-daemon-json) do_docker_daemon_json ;;
+  deploy-docker-group) do_deploy_docker_group ;;
+  ufw-web) do_ufw_web ;;
+  web-network) do_web_network ;;
+  ufw-docker-guard) do_ufw_docker_guard ;;
   *) die "Unknown unit (no action): $1" ;;
   esac
 }

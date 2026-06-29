@@ -1,0 +1,23 @@
+# Profile: web — the push-to-deploy doormat (CDC §6.3). minimal -> docker -> web.
+# This is the FINISH LINE: once converged, push-to-deploy can clone and
+# `docker compose up -d` with zero manual steps in between (the `web` network is
+# present, the deploy user exists, 80/443 are open). server-setup stops here — no
+# Caddy, no Caddyfile, no webhook, no app stack, no certs (CDC §5.2).
+
+extends: docker
+
+requires_bin:
+
+units:
+  # The firewall GROWS with the profile (D4): 80/443 are opened HERE and only
+  # here — minimal opens just 22, docker adds nothing on the firewall.
+  - ufw-web
+  # server-setup OWNS the `web` network (D5): it creates it idempotently and
+  # never deletes it. push-to-deploy's compose joins it as an external network.
+  - web-network
+  # ufw × Docker footgun (D8): Docker punches its own iptables rules, bypassing
+  # ufw. The rule of the house — only the Caddy proxy publishes 80/443 to the
+  # host; every app service stays on an internal network. ufw-docker is opt-in,
+  # documented, never enabled by default. This unit asserts the invariant (no
+  # non-Caddy container publishes 80/443) rather than fighting Docker.
+  - ufw-docker-guard

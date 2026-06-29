@@ -114,6 +114,49 @@ assert_sysctl_baseline() {
   fi
 }
 
+# --- Predicates: docker profile (units 13–15, CDC §6.2) ----------------------
+
+assert_docker_engine() {
+  command -v docker >/dev/null 2>&1 || return 1
+  systemctl is-active --quiet docker 2>/dev/null || return 1
+  docker compose version >/dev/null 2>&1 || return 1
+}
+
+assert_docker_daemon_json() {
+  [[ -f /etc/docker/daemon.json ]] || return 1
+  grep -q 'max-size' /etc/docker/daemon.json 2>/dev/null || return 1
+}
+
+assert_deploy_docker_group() {
+  id -nG "$DEPLOY_USER" 2>/dev/null | tr ' ' '\n' | grep -qx docker || return 1
+}
+
+# --- Predicates: web profile (units 16–18, CDC §6.3) -------------------------
+
+assert_ufw_web() {
+  command -v ufw >/dev/null 2>&1 || return 1
+  local s
+  s="$(ufw status 2>/dev/null)" || return 1
+  grep -qE '80/tcp[[:space:]]+ALLOW' <<<"$s" || return 1
+  grep -qE '443/tcp[[:space:]]+ALLOW' <<<"$s" || return 1
+}
+
+assert_web_network() {
+  command -v docker >/dev/null 2>&1 || return 1
+  docker network inspect web >/dev/null 2>&1 || return 1
+}
+
+# D8 invariant: no container may publish 80/443 to the host except the Caddy
+# proxy. At the doormat stage there are no containers, so it holds; it stays a
+# useful guard later (a stray `-p 80:80` would bypass ufw, the footgun).
+assert_ufw_docker_guard() {
+  command -v docker >/dev/null 2>&1 || return 1
+  local offenders
+  offenders="$(docker ps --format '{{.Names}} {{.Ports}}' 2>/dev/null |
+    grep -E '(0\.0\.0\.0|\[?::\]?):(80|443)->' | grep -viE 'caddy|proxy' || true)"
+  [[ -z "$offenders" ]]
+}
+
 # assert_unit <unit id> -> dispatch to the predicate above. ssh-hardening is
 # declared by the profile but deliberately deferred (Prompt 3): the convergence
 # loop skips it before ever reaching here.
@@ -131,6 +174,12 @@ assert_unit() {
   github-known-hosts) assert_github_known_hosts ;;
   sysctl-baseline) assert_sysctl_baseline ;;
   ssh-hardening) assert_ssh_hardening ;;
+  docker-engine) assert_docker_engine ;;
+  docker-daemon-json) assert_docker_daemon_json ;;
+  deploy-docker-group) assert_deploy_docker_group ;;
+  ufw-web) assert_ufw_web ;;
+  web-network) assert_web_network ;;
+  ufw-docker-guard) assert_ufw_docker_guard ;;
   *) die "Unknown unit (no assertion): $1" ;;
   esac
 }

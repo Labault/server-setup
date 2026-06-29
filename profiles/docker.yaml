@@ -1,0 +1,17 @@
+# Profile: docker — container runtime on top of the hardened base (CDC §6.2).
+# minimal -> docker. Adds Docker Engine + the compose plugin, the daemon.json log
+# guardrails, and puts the deploy user in the docker group.
+
+extends: minimal
+
+# Intentionally empty (NOT [docker]). server-setup INSTALLS Docker here, so it
+# can't require docker to already be present — that would make the bin-check
+# refuse to run on a fresh box, which is exactly the box this profile targets.
+# requires_bin lists tools server-setup needs but does NOT install; Docker is not
+# one. (Deviation from the §7 illustrative manifest — flagged on purpose.)
+requires_bin:
+
+units:
+  - docker-engine # Docker Engine + compose plugin, from the official apt repo
+  - docker-daemon-json # /etc/docker/daemon.json: log rotation (the 16 GB lesson)
+  - deploy-docker-group # add deploy to the docker group
