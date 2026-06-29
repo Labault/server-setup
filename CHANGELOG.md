@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- A profile name is now validated for format (`^[a-z][a-z0-9-]*$`) at the head of
+  `resolve_chain`, before it is ever used to build a file path. Previously a name
+  like `--profile ../../etc/passwd` was only caught by the later file-existence
+  check, so a traversal pointing at a real file could read outside `profiles/`.
+  The format guard fires first, with a message distinct from "Unknown profile".
+  Validation case `55-fail-profile-traversal` proves the refusal.
+
 ### Changed
 
 - Docs: renamed the locked spec `docs/Cahier des charges.md` to

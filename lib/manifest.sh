@@ -23,6 +23,17 @@ manifest_path() {
   printf '%s/profiles/%s.yaml' "$SERVER_ROOT" "$1"
 }
 
+# valid_profile_name <name> -> 0 if <name> is a safe profile identifier.
+# A profile name indexes straight into profiles/<name>.yaml, so it must be a
+# bare slug: a lowercase letter followed by lowercase alphanumerics and hyphens.
+# This rejects slashes, dots and `..` BEFORE manifest_path builds a path with it,
+# so `--profile ../../etc/passwd` can never escape profiles/ (existence alone
+# wouldn't catch a traversal that happens to point at a real file). Format only;
+# whether the profile exists is resolve_chain's separate concern.
+valid_profile_name() {
+  [[ "$1" =~ ^[a-z][a-z0-9-]*$ ]]
+}
+
 # manifest_extends <file> -> prints the parent profile name (empty if none)
 manifest_extends() {
   awk '
@@ -78,6 +89,7 @@ manifest_files() {
 resolve_chain() {
   local profile="$1" seen="${2:-}"
   local file
+  valid_profile_name "$profile" || die "Invalid profile name: '$profile' (expected ^[a-z][a-z0-9-]\$)"
   file="$(manifest_path "$profile")"
   [[ -f "$file" ]] || die "Unknown profile: '$profile' (no $file)"
   case " $seen " in

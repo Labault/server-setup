@@ -37,6 +37,27 @@ setup() {
   [ "${lines[17]}" = "ufw-docker-guard" ]
 }
 
+@test "valid_profile_name accepts slugs and rejects anything path-shaped" {
+  # Real profile names (bare lowercase slugs) pass.
+  for name in minimal docker web a a-b-c web2; do
+    run valid_profile_name "$name"
+    [ "$status" -eq 0 ] || { echo "should accept: $name"; false; }
+  done
+  # Anything that could escape profiles/ or isn't a slug is rejected on format,
+  # before manifest_path ever builds a path with it.
+  for name in "../../etc/passwd" "a/b" "./x" ".." "" "Web" "_x" "-x" "a.b" "a b"; do
+    run valid_profile_name "$name"
+    [ "$status" -ne 0 ] || { echo "should reject: $name"; false; }
+  done
+}
+
+@test "resolve_chain rejects a path-traversal profile before touching the filesystem" {
+  run resolve_chain "../../etc/passwd"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Invalid profile name"* ]]
+  [[ "$output" != *"Unknown profile"* ]]
+}
+
 @test "ssh-hardening is implemented, not deferred" {
   [[ "$DEFERRED_UNITS" != *" ssh-hardening "* ]]
   declare -f do_unit | grep -q 'ssh-hardening)'
