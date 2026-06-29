@@ -1,0 +1,31 @@
+# Profile: minimal — OS hardening + system defaults (CDC §6.1, units 1–12).
+# The base of the chain: minimal -> docker -> web. It opens only port 22; 80/443
+# arrive with the `web` profile (D4, the firewall grows with the profile).
+#
+# This is a skeleton: the units below are DECLARED (so `server list` and the
+# convergence loop can enumerate them) but NOT yet implemented. Each unit's
+# predicate + action will land in lib/assert.sh + lib/converge.sh.
+
+# No parent — minimal is the root of the inheritance chain.
+extends:
+
+# No machine-global binaries are required to harden a base Ubuntu box: every
+# unit below uses tools already present in the base image (useradd, ufw, awk…).
+requires_bin:
+
+# Desired-state units this profile converges (CDC §6.1). Order matters: the SSH
+# cutover (ssh-hardening) runs only after deploy-user and ufw-base have seeded a
+# non-root key and an allow-22 rule, so we never lock ourselves out (§9.3).
+units:
+  - deploy-user # 1  non-root sudoer, NOPASSWD validated by visudo -cf
+  - ufw-base # 2  deny incoming / allow out + allow 22, enabled after the rule
+  - fail2ban # 3  sshd jail
+  - unattended-upgrades # 4  auto security updates + auto-reboot 04:00
+  - timezone # 5  UTC by default, --timezone override
+  - locale # 6  en_US.UTF-8 generated + set
+  - timesync # 7  systemd-timesyncd active
+  - swap # 8  /swapfile 2G + vm.swappiness=10
+  - journald-cap # 9  SystemMaxUse capped (journald.conf.d drop-in)
+  - github-known-hosts # 10 github.com pre-seeded for later app-repo pulls
+  - sysctl-baseline # 11 empty drop-in by default; network hardening behind --paranoid
+  - ssh-hardening # 12 root off, password off, pubkey only — anti-lockout cutover

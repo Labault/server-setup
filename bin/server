@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+#
+# server — converges a fresh Ubuntu box toward a hardened, deployable state, up
+# to the exact line where push-to-deploy takes over. It hardens the OS and lays
+# the doormat (deploy user, docker, `web` network); it never deploys an app.
+# See docs/Cahier des charges.md.
+#
+set -euo pipefail
+
+# We use associative arrays and other bash 4+ features. Fail loudly rather than
+# break mysteriously under an old shell (e.g. macOS's /bin/bash 3.2 in dev).
+if ((BASH_VERSINFO[0] < 4)); then
+  printf 'server: bash 4+ required (found %s). Install a modern bash.\n' \
+    "${BASH_VERSION}" >&2
+  exit 1
+fi
+
+# --- Resolve our own location (repo root), following symlinks ----------------
+# In production the CLI is reached through /usr/local/bin/server -> the clone in
+# /opt/server-setup, so we must chase the symlink chain to find the real root.
+_src="${BASH_SOURCE[0]}"
+while [[ -L "$_src" ]]; do
+  _dir="$(cd -P "$(dirname "$_src")" >/dev/null 2>&1 && pwd)"
+  _src="$(readlink "$_src")"
+  [[ "$_src" != /* ]] && _src="$_dir/$_src"
+done
+SERVER_BIN_DIR="$(cd -P "$(dirname "$_src")" >/dev/null 2>&1 && pwd)"
+SERVER_ROOT="$(cd -P "$SERVER_BIN_DIR/.." >/dev/null 2>&1 && pwd)"
+export SERVER_ROOT
+
+# shellcheck source=lib/common.sh
+source "$SERVER_ROOT/lib/common.sh"
+
+usage() {
+  cat >&2 <<EOF
+${C_BOLD}server${C_RESET} — converge a fresh box into a hardened, deployable state.
+
+${C_BOLD}USAGE${C_RESET}
+  server <command> [options]
+
+${C_BOLD}COMMANDS${C_RESET}
+  setup      Converge the box toward a profile's desired state (+ write state.yaml)
+  doctor     Re-evaluate the converged profile's assertions + push-to-deploy health
+  confirm    Disarm the anti-lockout dead-man's switch after an SSH cutover
+  list       List available profiles, their inheritance, required bins and units
+  update     Update server-setup itself (git pull in /opt). Never touches the box.
+
+${C_BOLD}GLOBAL OPTIONS${C_RESET}
+  --dry-run        Show what would change without acting
+  -h, --help       Show this help
+  -V, --version    Show the server-setup version
+
+Run 'server <command> --help' for command-specific options.
+EOF
+}
+
+# --- Global option parsing ---------------------------------------------------
+# Peel off global flags, then hand the rest to the subcommand.
+COMMAND=""
+declare -a ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  --dry-run) DRY_RUN=1 ;;
+  -h | --help)
+    if [[ -z "$COMMAND" ]]; then
+      usage
+      exit 0
+    fi
+    ARGS+=("$1")
+    ;;
+  -V | --version)
+    printf '%s\n' "$(server_version)"
+    exit 0
+    ;;
+  --)
+    shift
+    while [[ $# -gt 0 ]]; do
+      ARGS+=("$1")
+      shift
+    done
+    break
+    ;;
+  -*)
+    if [[ -z "$COMMAND" ]]; then
+      log_error "Unknown global option: $1"
+      usage
+      exit 2
+    fi
+    ARGS+=("$1")
+    ;;
+  *)
+    if [[ -z "$COMMAND" ]]; then
+      COMMAND="$1"
+    else
+      ARGS+=("$1")
+    fi
+    ;;
+  esac
+  shift
+done
+export DRY_RUN
+
+if [[ -z "$COMMAND" ]]; then
+  usage
+  exit 2
+fi
+
+dispatch() {
+  local cmd="$1"
+  shift
+  local module="$SERVER_ROOT/lib/cmd_${cmd}.sh"
+  # Whitelist: a server provisioner is not a place for guessed verbs. No detect
+  # (provisioning is never inferred, A1), no reconcile (setup reconverges, D1).
+  case "$cmd" in
+  setup | doctor | confirm | list | update)
+    # Whitelisted but not yet built in this skeleton (doctor, confirm).
+    [[ -f "$module" ]] || die "'${cmd}' is not implemented yet."
+    # shellcheck source=/dev/null
+    source "$module"
+    "cmd_${cmd}" "$@"
+    ;;
+  *)
+    log_error "Unknown command: ${cmd}"
+    usage
+    exit 2
+    ;;
+  esac
+}
+
+dispatch "$COMMAND" "${ARGS[@]+"${ARGS[@]}"}"
