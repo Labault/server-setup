@@ -75,6 +75,11 @@ EOF
       PARANOID=1
     fi
   fi
+  # --ufw-docker is opt-in (D8) and not derivable from disk, so read what setup
+  # persisted. Absent in older states -> off, and the ufw-docker-enforce unit is
+  # skipped below (unit_inactive), exactly as during setup.
+  UFW_DOCKER="$(state_ufw_docker "$STATE_FILE")"
+  [[ -n "$UFW_DOCKER" ]] || UFW_DOCKER=0
 
   printf '%sserver doctor%s — profile %s%s%s (converged %s, v%s)\n' \
     "$C_BOLD" "$C_RESET" "$C_BOLD" "$profile" "$C_RESET" "${converged:-?}" "${version:-?}"
@@ -91,6 +96,7 @@ EOF
   while IFS= read -r u; do
     [[ -z "$u" ]] && continue
     [[ "$DEFERRED_UNITS" == *" $u "* ]] && continue
+    unit_inactive "$u" && continue
     if assert_unit "$u"; then
       _doctor_line pass "$u" "$(unit_describe "$u")"
       oks=$((oks + 1))

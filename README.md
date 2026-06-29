@@ -121,7 +121,9 @@ Four things will bite you if you don't know them. They're by design.
    ufw, so publishing a container port reaches the world even behind a deny-all
    firewall. The rule of the house: **only the Caddy proxy publishes 80/443**; every
    app service stays on an internal network. `server doctor` asserts no other
-   container publishes those ports. `ufw-docker` is opt-in, never enabled by default.
+   container publishes those ports. Want ufw to actually govern Docker's ports?
+   `--ufw-docker` installs the pinned `ufw-docker` integration — opt-in, never
+   enabled by default (it rewrites ufw's tables, so you turn it on deliberately).
 4. **No key, no cutover.** The cutover refuses up front if the `deploy` user has no
    `authorized_keys`: key-only SSH with no key is a guaranteed lockout, and the
    dead-man's switch is a poor net for a problem you can see coming. `deploy`

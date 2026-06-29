@@ -20,10 +20,11 @@ state_version() { state_scalar "$1" server_setup_version; }
 state_commit() { state_scalar "$1" server_setup_commit; }
 state_converged_at() { state_scalar "$1" converged_at; }
 state_confirm_state() { state_scalar "$1" confirm_state; }
-# timezone/paranoid: absent in states written before they were persisted —
-# callers must fall back when these come back empty (backward compatibility).
+# timezone/paranoid/ufw_docker: absent in states written before they were
+# persisted — callers must fall back when these come back empty (backward compat).
 state_timezone() { state_scalar "$1" timezone; }
 state_paranoid() { state_scalar "$1" paranoid; }
+state_ufw_docker() { state_scalar "$1" ufw_docker; }
 
 # state_files <file> -> "path<TAB>sha256<TAB>tpl_sha256" per line.
 # tpl_sha256 is empty when the entry didn't record one.

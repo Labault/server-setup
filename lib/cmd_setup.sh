@@ -17,6 +17,7 @@ cmd_setup() {
   PARANOID=0
   NO_OVERWRITE=0
   ALLOW_KEYLESS_SSH_CUTOVER=0
+  UFW_DOCKER=0
   ADMIN_KEYS_FILE=""
   local skip_bin_check=0
 
@@ -35,6 +36,7 @@ cmd_setup() {
       ;;
     --timezone=*) DESIRED_TIMEZONE="${1#*=}" ;;
     --paranoid) PARANOID=1 ;;
+    --ufw-docker) UFW_DOCKER=1 ;;
     --authorized-keys)
       [[ $# -ge 2 ]] || die "--authorized-keys requires a file path"
       ADMIN_KEYS_FILE="$2"
@@ -55,7 +57,12 @@ Options:
   --profile <p>     Required. Which profile to converge (minimal|docker|web).
   --timezone <tz>   Timezone to set (default: UTC).
   --paranoid        Enable the sysctl network-hardening baseline (D6).
-  --authorized-keys <file>
+  --ufw-docker      web profile only. Opt-in (D8): install the pinned ufw-docker
+                    integration so ufw actually governs the ports Docker
+                    publishes (rewrites ufw's after.rules). OFF by default and
+                    never auto-enabled; without it only the consultative guard
+                    runs. ufw-docker rewrites ufw's tables and can surprise you —
+                    strict opt-in. See docs/profiles/web.md.
                     Seed the deploy user with the admin public key(s) in <file>
                     (one per line), appended and deduped. Decouples deploy from
                     whatever /root had; this is what lets the SSH cutover pass

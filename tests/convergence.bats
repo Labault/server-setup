@@ -21,7 +21,7 @@ setup() {
   [ "${lines[11]}" = "ssh-hardening" ]
 }
 
-@test "web resolves the full chain minimal -> docker -> web (18 units)" {
+@test "web resolves the full chain minimal -> docker -> web (19 units)" {
   run resolve_chain web
   [ "$status" -eq 0 ]
   [ "${lines[0]}" = "minimal" ]
@@ -30,11 +30,28 @@ setup() {
 
   run resolve_units web
   [ "$status" -eq 0 ]
-  [ "${#lines[@]}" -eq 18 ]
+  [ "${#lines[@]}" -eq 19 ]
   # minimal units first (parent before child), web units last.
   [ "${lines[0]}" = "deploy-user" ]
   [ "${lines[12]}" = "docker-engine" ]
   [ "${lines[17]}" = "ufw-docker-guard" ]
+  [ "${lines[18]}" = "ufw-docker-enforce" ]
+}
+
+@test "ufw-docker-enforce is opt-in: inactive unless UFW_DOCKER=1" {
+  # Off (default) -> inactive: the engine and doctor skip it, never assert it.
+  UFW_DOCKER=0
+  run unit_inactive ufw-docker-enforce
+  [ "$status" -eq 0 ]
+  # On -> active: it converges like any other unit.
+  UFW_DOCKER=1
+  run unit_inactive ufw-docker-enforce
+  [ "$status" -ne 0 ]
+  # No other unit is ever gated off by this mechanism.
+  run unit_inactive ufw-docker-guard
+  [ "$status" -ne 0 ]
+  run unit_inactive ufw-base
+  [ "$status" -ne 0 ]
 }
 
 @test "valid_profile_name accepts slugs and rejects anything path-shaped" {

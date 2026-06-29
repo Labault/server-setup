@@ -37,6 +37,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `server setup --profile web --ufw-docker` opts into real ufw×Docker enforcement
+  (D8): a new `ufw-docker-enforce` unit installs a **pinned, checksum-verified**
+  copy of `ufw-docker` (immutable upstream commit, never a `curl | bash` of a
+  moving `HEAD`; a checksum mismatch aborts the run) and wires its `DOCKER-USER`
+  block into `/etc/ufw/after.rules` so ufw governs the ports Docker publishes.
+  **OFF by default and never auto-enabled**: without the flag the unit is skipped
+  and only the consultative `ufw-docker-guard` runs, so behaviour is unchanged.
+  The choice is recorded as `ufw_docker` in `state.yaml`, and `server doctor`
+  reads it back to re-check the marker (skipping the unit on boxes converged
+  without the flag). The compromise (ufw-docker rewrites ufw's tables and can
+  surprise you) is why it's strict opt-in. Proven by validation case
+  `56-ufw-docker-enforce` and `convergence.bats` gating tests.
 - `server setup --authorized-keys <file>` seeds the `deploy` user from an explicit
   file of admin public keys (one per line), appended and deduped (`0600`, owner
   `deploy`). It decouples `deploy` from whatever key root happened to have, and is

@@ -43,6 +43,10 @@ write_server_state() {
     # from the globals setup poses; defaulted for safety.
     printf 'timezone: %s\n' "${DESIRED_TIMEZONE:-UTC}"
     printf 'paranoid: %s\n' "${PARANOID:-0}"
+    # Opt-in ufw-docker enforcement (D8). Persisted so doctor knows whether the
+    # ufw-docker-enforce unit is active for this box (it isn't derivable from disk
+    # alone, and the unit is skipped — not asserted — when off).
+    printf 'ufw_docker: %s\n' "${UFW_DOCKER:-0}"
 
     printf 'files:\n'
     local entry path sha tpl

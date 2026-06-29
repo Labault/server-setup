@@ -24,6 +24,19 @@ source "$SERVER_ROOT/lib/manifest.sh"
 # a mechanism for any future not-yet-built unit.
 DEFERRED_UNITS=""
 
+# unit_inactive <unit id> -> 0 (true) when a unit is DECLARED by the profile but
+# left inactive by the current flags, so the engine and `doctor` both skip it:
+# never asserted, never acted, never recorded. This is distinct from
+# DEFERRED_UNITS (units not yet implemented). The only conditional unit today is
+# ufw-docker-enforce, gated by --ufw-docker (UFW_DOCKER) — opt-in, never on by
+# default (D8). doctor reads UFW_DOCKER back from state, so it stays in sync.
+unit_inactive() {
+  case "$1" in
+  ufw-docker-enforce) [[ "${UFW_DOCKER:-0}" != 1 ]] ;;
+  *) return 1 ;;
+  esac
+}
+
 # ---------------------------------------------------------------------------
 # File / package helpers
 # ---------------------------------------------------------------------------
@@ -136,6 +149,7 @@ unit_describe() {
   ufw-web) printf 'ufw allow 80/tcp + 443/tcp (firewall grows with the profile)' ;;
   web-network) printf 'create the docker web network (idempotent, owned by server-setup)' ;;
   ufw-docker-guard) printf 'assert no non-Caddy container publishes 80/443 (ufw×Docker footgun)' ;;
+  ufw-docker-enforce) printf 'install pinned ufw-docker so ufw governs Docker-published ports (opt-in, --ufw-docker)' ;;
   *) printf '?' ;;
   esac
 }
@@ -599,6 +613,49 @@ do_ufw_docker_guard() {
   log_info "ufw×Docker (D8): only the Caddy proxy should publish 80/443; keep app services on internal networks. ufw-docker stays opt-in — see docs/profiles/web."
 }
 
+# Pinned ufw-docker for the OPT-IN enforcement unit (D8). We pin to an IMMUTABLE
+# upstream commit and verify a recorded SHA256, so converge never runs a moving
+# HEAD: if upstream retags or the content drifts, the checksum gate fails and we
+# refuse rather than execute unverified code. ufw-docker is GPLv3, so we fetch +
+# run it at converge time instead of vendoring it into this MIT repo.
+UFW_DOCKER_REF="78366b6afe6e566cd53f7e55341889c2e3c863e7" # upstream tag 251123
+UFW_DOCKER_SHA256="c3e5f0bf6061a3a2e7d7ac06abc80665707d2f4c91e90d76f22e4168863fb472"
+
+do_ufw_docker_enforce() {
+  # Reached only when opted in (the loop gates on unit_inactive, so UFW_DOCKER==1
+  # here). This is the real fix the consultative guard only reports: ufw-docker
+  # rewrites ufw's after.rules (a DOCKER-USER block) so ufw governs the ports
+  # Docker publishes. The guard above stays active either way.
+  ensure_pkg ufw
+  ensure_pkg curl
+  ensure_pkg ca-certificates
+  command -v docker >/dev/null 2>&1 ||
+    die "ufw-docker enforcement needs Docker — it is a web-profile unit, so docker is installed earlier in the chain"
+
+  local url tmp got
+  url="https://raw.githubusercontent.com/chaifeng/ufw-docker/${UFW_DOCKER_REF}/ufw-docker"
+  tmp="$(mktemp)"
+  if ! curl -fsSL "$url" -o "$tmp"; then
+    rm -f "$tmp"
+    die "failed to download pinned ufw-docker (${UFW_DOCKER_REF})"
+  fi
+  got="$(file_sha256 "$tmp")"
+  if [[ "$got" != "$UFW_DOCKER_SHA256" ]]; then
+    rm -f "$tmp"
+    die "ufw-docker checksum mismatch — expected ${UFW_DOCKER_SHA256}, got ${got}. Refusing to run unverified code."
+  fi
+
+  # `ufw-docker install` is itself idempotent: it backs up after.rules and only
+  # rewrites its managed block on drift. It then ASKS for a ufw restart; a reload
+  # re-reads after.rules and is enough (we reload what we needn't restart).
+  if ! bash "$tmp" install; then
+    rm -f "$tmp"
+    return 1
+  fi
+  rm -f "$tmp"
+  ufw reload >/dev/null 2>&1 || return 1
+}
+
 # do_unit <unit id> -> dispatch to the action above.
 do_unit() {
   case "$1" in
@@ -620,6 +677,7 @@ do_unit() {
   ufw-web) do_ufw_web ;;
   web-network) do_web_network ;;
   ufw-docker-guard) do_ufw_docker_guard ;;
+  ufw-docker-enforce) do_ufw_docker_enforce ;;
   *) die "Unknown unit (no action): $1" ;;
   esac
 }
@@ -675,6 +733,14 @@ converge_profile() {
     if [[ "$DEFERRED_UNITS" == *" $u "* ]]; then
       log_warn "skip: ${u} — deferred to the SSH cutover (Prompt 3)"
       deferred=$((deferred + 1))
+      continue
+    fi
+
+    # Skip conditional units the current flags leave inactive (e.g. ufw-docker-
+    # enforce without --ufw-docker). Opt-in by design (D8): never run by default,
+    # never asserted, never recorded — the consultative ufw-docker-guard still runs.
+    if unit_inactive "$u"; then
+      log_info "skip: ${u} — opt-in, not requested (pass --ufw-docker; see docs/profiles/web)"
       continue
     fi
 

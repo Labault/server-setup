@@ -157,6 +157,14 @@ assert_ufw_docker_guard() {
   [[ -z "$offenders" ]]
 }
 
+# Opt-in enforcement (D8): the ufw-docker integration writes a managed block into
+# ufw's after.rules; the presence of that block's marker is the proof it's wired.
+# Evaluated only when UFW_DOCKER==1 — the convergence loop and doctor both gate on
+# unit_inactive, so a box converged without --ufw-docker never reaches this.
+assert_ufw_docker_enforce() {
+  grep -q '^# BEGIN UFW AND DOCKER' /etc/ufw/after.rules 2>/dev/null || return 1
+}
+
 # assert_unit <unit id> -> dispatch to the predicate above. ssh-hardening is
 # declared by the profile but deliberately deferred (Prompt 3): the convergence
 # loop skips it before ever reaching here.
@@ -180,6 +188,7 @@ assert_unit() {
   ufw-web) assert_ufw_web ;;
   web-network) assert_web_network ;;
   ufw-docker-guard) assert_ufw_docker_guard ;;
+  ufw-docker-enforce) assert_ufw_docker_enforce ;;
   *) die "Unknown unit (no assertion): $1" ;;
   esac
 }

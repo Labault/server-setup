@@ -21,3 +21,12 @@ units:
   # documented, never enabled by default. This unit asserts the invariant (no
   # non-Caddy container publishes 80/443) rather than fighting Docker.
   - ufw-docker-guard
+  # OPT-IN enforcement (D8), OFF by default and NEVER auto-enabled. With the
+  # --ufw-docker flag, server-setup installs the pinned ufw-docker integration so
+  # ufw actually GOVERNS the ports Docker publishes (it rewrites ufw's after.rules
+  # with a DOCKER-USER block). Without the flag this unit is skipped entirely and
+  # only the consultative guard above runs — behaviour is unchanged.
+  # COMPROMISE: ufw-docker rewrites ufw's tables and can surprise you (rules you
+  # didn't write, behaviour that differs from plain ufw), which is exactly why it
+  # is strict opt-in rather than a default. See docs/profiles/web.md.
+  - ufw-docker-enforce

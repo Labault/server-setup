@@ -43,13 +43,16 @@ setup() {
   STATE_FILE="$STATE_DIR/state.yaml"
   STATE_FILES=()
   STATE_ASSERTIONS=()
-  # The globals setup poses, mirroring a `--timezone Europe/Paris --paranoid` run.
+  # The globals setup poses, mirroring a `--timezone Europe/Paris --paranoid
+  # --ufw-docker` run.
   DESIRED_TIMEZONE="Europe/Paris"
   PARANOID=1
-  write_server_state minimal confirmed
+  UFW_DOCKER=1
+  write_server_state web confirmed
 
   [ "$(state_timezone "$STATE_FILE")" = "Europe/Paris" ]
   [ "$(state_paranoid "$STATE_FILE")" = "1" ]
+  [ "$(state_ufw_docker "$STATE_FILE")" = "1" ]
 
   # Reproduce doctor's read+fallback block: state wins, no UTC fallback kicks in.
   DESIRED_TIMEZONE="$(state_timezone "$STATE_FILE")"
@@ -68,9 +71,14 @@ assertions:
 EOF
   [ -z "$(state_timezone "$STATE_FILE")" ]
   [ -z "$(state_paranoid "$STATE_FILE")" ]
+  [ -z "$(state_ufw_docker "$STATE_FILE")" ]
 
   # The doctor fallback: empty timezone -> UTC, empty paranoid -> derived (0 here).
   DESIRED_TIMEZONE="$(state_timezone "$STATE_FILE")"
   [[ -n "$DESIRED_TIMEZONE" ]] || DESIRED_TIMEZONE="UTC"
   [ "$DESIRED_TIMEZONE" = "UTC" ]
+  # Empty ufw_docker -> off, so the opt-in enforce unit stays skipped.
+  UFW_DOCKER="$(state_ufw_docker "$STATE_FILE")"
+  [[ -n "$UFW_DOCKER" ]] || UFW_DOCKER=0
+  [ "$UFW_DOCKER" = "0" ]
 }
