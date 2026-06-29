@@ -53,6 +53,7 @@ no-op.
 - `server confirm` disarms the anti-lockout dead-man's switch after the SSH cutover.
 - `server list` / `server update` enumerate profiles and self-update the tool.
 - Every mutating command has `--dry-run`; system files are backed up before they're touched.
+- `server prune-backups` reclaims those backups on demand (`--older-than 30d` / `--keep 5`); there is no auto-purge.
 
 ![server-setup system overview: install.sh symlinks the server CLI into /usr/local/bin; the CLI exposes setup, doctor, confirm, list and update; server setup converges the box (deploy user, ufw, fail2ban, swap, the SSH cutover, Docker, the web network), writes /var/lib/server-setup/state.yaml with managed files and assertions, and arms a 10-minute anti-lockout dead-man's switch on the SSH cutover; that is the finish line where push-to-deploy clones and runs docker compose up -d](docs/assets/images/system-overview.svg)
 

@@ -280,6 +280,7 @@ Et voici ce qui **atterrit sur le serveur** après `server setup --profile web` 
 |`server doctor`|Ré-évalue les assertions du profil convergé + santé push-to-deploy|
 |`server list`|Liste les profils, leur héritage, binaires requis et unités|
 |`server update`|Met à jour `server-setup` lui-même (`git pull` dans `/opt`). **Ne touche pas au serveur convergé.**|
+|`server prune-backups`|Purge les backups horodatés (`--older-than <dur>` et/ou `--keep <n>`). Reclaim explicite de l'opérateur, **pas d'auto-purge** (§9.6).|
 
 Drapeaux notables : `--paranoid` (active la baseline sysctl, D6), `--timezone <tz>` (sinon UTC), `--skip-bin-check`, `--no-overwrite`. Pas de `detect`, pas de `reconcile`.
 

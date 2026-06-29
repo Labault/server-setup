@@ -44,6 +44,7 @@ ${C_BOLD}COMMANDS${C_RESET}
   confirm    Disarm the anti-lockout dead-man's switch after an SSH cutover
   list       List available profiles, their inheritance, required bins and units
   update     Update server-setup itself (git pull in /opt). Never touches the box.
+  prune-backups  Purge old timestamped backups (--older-than / --keep). No auto-purge.
 
 ${C_BOLD}GLOBAL OPTIONS${C_RESET}
   --dry-run        Show what would change without acting
@@ -109,16 +110,19 @@ fi
 dispatch() {
   local cmd="$1"
   shift
-  local module="$SERVER_ROOT/lib/cmd_${cmd}.sh"
+  # Command names may carry a hyphen (prune-backups); files and functions use
+  # underscores, so normalize once and key everything off the slug.
+  local slug="${cmd//-/_}"
+  local module="$SERVER_ROOT/lib/cmd_${slug}.sh"
   # Whitelist: a server provisioner is not a place for guessed verbs. No detect
   # (provisioning is never inferred, A1), no reconcile (setup reconverges, D1).
   case "$cmd" in
-  setup | doctor | confirm | list | update)
+  setup | doctor | confirm | list | update | prune-backups)
     # Whitelisted but not yet built in this skeleton (doctor, confirm).
     [[ -f "$module" ]] || die "'${cmd}' is not implemented yet."
     # shellcheck source=/dev/null
     source "$module"
-    "cmd_${cmd}" "$@"
+    "cmd_${slug}" "$@"
     ;;
   *)
     log_error "Unknown command: ${cmd}"

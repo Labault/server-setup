@@ -37,6 +37,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `server prune-backups` purges the timestamped backups `setup` leaves under
+  `/var/backups/server-setup/`. server-setup still **never auto-purges** (§9.6,
+  locked): reclaiming that disk is now an explicit operator command instead of a
+  manual `rm`. Two composable policies: `--older-than <dur>` (e.g. `30d`, `12h`,
+  `2w`) deletes backups older than the cutoff, `--keep <n>` retains only the `n`
+  most recent. Given both, `--keep` is a floor `--older-than` can't cross (a
+  backup is deleted only when old AND beyond the kept set). `--dry-run` lists what
+  would go without deleting (and without needing root); the real purge requires
+  EUID 0 like every other mutation. Proven by `prune_backups.bats` (selection +
+  dry-run safety + non-root refusal) and validation case `57-prune-backups`.
 - `server setup --profile web --ufw-docker` opts into real ufw×Docker enforcement
   (D8): a new `ufw-docker-enforce` unit installs a **pinned, checksum-verified**
   copy of `ufw-docker` (immutable upstream commit, never a `curl | bash` of a
