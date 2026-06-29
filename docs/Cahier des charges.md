@@ -326,6 +326,8 @@ server_setup_version: 0.1.0          # version de l'outil au moment du setup
 server_setup_commit: <sha>           # double champ de version (décision durcie)
 converged_at: 2026-07-03T09:00:00Z
 confirm_state: confirmed             # pending-confirmation | confirmed (anti-lockout)
+timezone: Europe/Paris               # fuseau passé à setup (repli UTC si absent)
+paranoid: 0                          # 1 si setup --paranoid (repli : dérivé du drop-in sysctl)
 files:                               # nature 1 : fichiers managés (comme bootstrap)
   - path: /etc/docker/daemon.json
     sha256: <hash réel sur disque>
@@ -339,7 +341,7 @@ assertions:                          # nature 2 : prédicats re-vérifiables
     checked_at: 2026-07-03T09:00:00Z
 ```
 
-Lu par `server doctor`, **jamais édité à la main**. Le double champ version/commit permet de savoir non seulement « quelle version » mais « depuis quel commit exact » la box a été convergée.
+Lu par `server doctor`, **jamais édité à la main**. Le double champ version/commit permet de savoir non seulement « quelle version » mais « depuis quel commit exact » la box a été convergée. Les champs `timezone` et `paranoid` mémorisent les réglages passés à `setup` (qui ne se devinent ni par un hash ni par un prédicat) pour que `doctor` ré-évalue avec les **mêmes** valeurs et ne signale pas de fausse dérive ; un vieux `state.yaml` sans ces champs reste lisible (repli : `UTC`, et `paranoid` dérivé du drop-in sysctl).
 
 ### 10.2 Drop-in SSH (`99-server-setup.conf`)
 

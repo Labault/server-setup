@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `server doctor` no longer reports false timezone drift on a box converged with
+  a non-UTC `--timezone`: `setup` now persists `timezone` and `paranoid` in
+  `state.yaml`, and `doctor` reads them back instead of hardcoding `UTC`. States
+  written before this fix still read (fallback: `UTC`, `paranoid` derived from the
+  sysctl drop-in).
+
 ### Added
 
 - The `server` CLI: a desired-state convergence engine that hardens a fresh

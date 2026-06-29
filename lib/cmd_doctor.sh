@@ -62,13 +62,18 @@ EOF
   confirm="$(state_confirm_state "$STATE_FILE")"
   [[ -n "$profile" ]] || die "state file has no profile — corrupt ${STATE_FILE}?"
 
-  # doctor can't read timezone/paranoid from the locked state schema (§10.1), so
-  # it uses the same defaults setup does. PARANOID is cheaply derivable from the
-  # deposited sysctl drop-in, so derive it for an accurate sysctl check.
-  DESIRED_TIMEZONE="UTC"
-  PARANOID=0
-  if grep -q 'rp_filter' /etc/sysctl.d/99-server-setup.conf 2>/dev/null; then
-    PARANOID=1
+  # timezone/paranoid drive predicates that aren't hashable or re-derivable from
+  # disk alone, so we read what setup persisted (§10.1). Backward-compatible
+  # fallback for states written before these fields existed: assume UTC, and
+  # derive PARANOID from the deposited sysctl drop-in as we used to.
+  DESIRED_TIMEZONE="$(state_timezone "$STATE_FILE")"
+  [[ -n "$DESIRED_TIMEZONE" ]] || DESIRED_TIMEZONE="UTC"
+  PARANOID="$(state_paranoid "$STATE_FILE")"
+  if [[ -z "$PARANOID" ]]; then
+    PARANOID=0
+    if grep -q 'rp_filter' /etc/sysctl.d/99-server-setup.conf 2>/dev/null; then
+      PARANOID=1
+    fi
   fi
 
   printf '%sserver doctor%s — profile %s%s%s (converged %s, v%s)\n' \

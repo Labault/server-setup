@@ -38,6 +38,11 @@ write_server_state() {
     printf 'server_setup_commit: %s\n' "$commit"
     printf 'converged_at: %s\n' "$converged_at"
     printf 'confirm_state: %s\n' "$confirm_state"
+    # Setup-time knobs that aren't derivable from a hash or a predicate, so
+    # doctor would otherwise have to guess them (and falsely flag drift). Read
+    # from the globals setup poses; defaulted for safety.
+    printf 'timezone: %s\n' "${DESIRED_TIMEZONE:-UTC}"
+    printf 'paranoid: %s\n' "${PARANOID:-0}"
 
     printf 'files:\n'
     local entry path sha tpl
