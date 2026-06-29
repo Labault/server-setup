@@ -58,13 +58,19 @@ setup() {
   # Real profile names (bare lowercase slugs) pass.
   for name in minimal docker web a a-b-c web2; do
     run valid_profile_name "$name"
-    [ "$status" -eq 0 ] || { echo "should accept: $name"; false; }
+    [ "$status" -eq 0 ] || {
+      echo "should accept: $name"
+      false
+    }
   done
   # Anything that could escape profiles/ or isn't a slug is rejected on format,
   # before manifest_path ever builds a path with it.
   for name in "../../etc/passwd" "a/b" "./x" ".." "" "Web" "_x" "-x" "a.b" "a b"; do
     run valid_profile_name "$name"
-    [ "$status" -ne 0 ] || { echo "should reject: $name"; false; }
+    [ "$status" -ne 0 ] || {
+      echo "should reject: $name"
+      false
+    }
   done
 }
 
