@@ -1,0 +1,75 @@
+# Managed by bootstrap — do not edit by hand.
+# Written by `bootstrap apply`; read by `bootstrap doctor` (Phase 2).
+profile: shell
+bootstrap_version: 0.6.0
+bootstrap_commit: 5c400614c83120ab5cf30fa4627b41818aa06f4b
+applied_at: 2026-06-29T09:31:01Z
+files:
+  - path: .editorconfig
+    sha256: 6be20cd03738e22254d1e2f192865a9d501853807db1a2a658a613164d6edef2
+    tpl_sha256: 6be20cd03738e22254d1e2f192865a9d501853807db1a2a658a613164d6edef2
+  - path: .gitignore
+    sha256: 115f31230164b04706e17225780ae414741ff137a26af21feac32ebb35f54538
+    tpl_sha256: de9a19b1255dbe2d4a5649cb6b1d76b579b0daac84226ce00d8034d2b60474e9
+    strategy: merge-gitignore
+  - path: .pre-commit-config.yaml
+    sha256: 1f62baf33ef943d4ca9b18fba604356703e268797f01e002eb6822c577caa68b
+    tpl_sha256: 1f62baf33ef943d4ca9b18fba604356703e268797f01e002eb6822c577caa68b
+  - path: scripts/lint-commit-msg.sh
+    sha256: 59b8b9e53222588dec284d0137bc9ced8921aa321d500b5cf60b599588595c3a
+    tpl_sha256: 59b8b9e53222588dec284d0137bc9ced8921aa321d500b5cf60b599588595c3a
+  - path: .gitleaks.toml
+    sha256: 6c71b73c1e2e8c13310e3d04e5cb6fca82990d4409933e14930929990a21c3ea
+    tpl_sha256: 6c71b73c1e2e8c13310e3d04e5cb6fca82990d4409933e14930929990a21c3ea
+  - path: .shellcheckrc
+    sha256: b7c65104c3500c9ab212e2dac3aef993f95057520ea446aa6fde72a44f5fc7b4
+    tpl_sha256: b7c65104c3500c9ab212e2dac3aef993f95057520ea446aa6fde72a44f5fc7b4
+  - path: .markdownlint-cli2.yaml
+    sha256: 3c9b56ebc8cf440fc847c8e40114b67ef8fa9d839c5d7d37e1b886edfefd59de
+    tpl_sha256: 3c9b56ebc8cf440fc847c8e40114b67ef8fa9d839c5d7d37e1b886edfefd59de
+  - path: lychee.toml
+    sha256: 41b147bfb6754ed93f2fcce589d5284c98d836ecc8c9b49c0241c9dfdf86e3c3
+    tpl_sha256: 41b147bfb6754ed93f2fcce589d5284c98d836ecc8c9b49c0241c9dfdf86e3c3
+  - path: Makefile
+    sha256: 7c05fa8736a1dc7e7d41408e109e496428e6f1c8033e0e8e992928cb05b10064
+    tpl_sha256: 7c05fa8736a1dc7e7d41408e109e496428e6f1c8033e0e8e992928cb05b10064
+  - path: SECURITY.md
+    sha256: 72715a83f54078c895f97ee68fcea1cc3696c45c1e751208e8f5c6540177b87d
+    tpl_sha256: 72715a83f54078c895f97ee68fcea1cc3696c45c1e751208e8f5c6540177b87d
+  - path: CONTRIBUTING.md
+    sha256: 57eac323f535e83d6df49cf00f4bce1251ab5f87d3ccf60b63b83beeb62cca8c
+    tpl_sha256: 57eac323f535e83d6df49cf00f4bce1251ab5f87d3ccf60b63b83beeb62cca8c
+  - path: CLAUDE.md
+    sha256: 52bc16b8e914cbc6b87f4a7c1f45ab7c0bd0c0f1ba333ddecea1d3ee5fc59aac
+    tpl_sha256: 52bc16b8e914cbc6b87f4a7c1f45ab7c0bd0c0f1ba333ddecea1d3ee5fc59aac
+  - path: .vscode/extensions.json
+    sha256: 72c2ba9ba1903393b386e23caaf5ce946f92049b5e5caa0af6dbc7484146f89e
+    tpl_sha256: 6cb54edd230eaba3393c122299e80f540211cf87fa1ba7deffdca750268b27db
+    strategy: merge-json
+  - path: .github/workflows/ci.yml
+    sha256: 179398ffdeb90d75ba80ae6ad38efe1804b4e77af3812a39cccfbfedd09ab9eb
+    tpl_sha256: 179398ffdeb90d75ba80ae6ad38efe1804b4e77af3812a39cccfbfedd09ab9eb
+  - path: .github/workflows/security.yml
+    sha256: 1f7a48377d5c432712e7c00ea165dc008c1886b7c75e0f8e12268bf6953b910c
+    tpl_sha256: 1f7a48377d5c432712e7c00ea165dc008c1886b7c75e0f8e12268bf6953b910c
+  - path: .github/dependabot.yml
+    sha256: 403f70b1e177fd1518be7f60cf4b77b8f5de1c0a1c022a528edec962879c2b50
+    tpl_sha256: 403f70b1e177fd1518be7f60cf4b77b8f5de1c0a1c022a528edec962879c2b50
+  - path: .github/PULL_REQUEST_TEMPLATE.md
+    sha256: 2480af83a65f98da22ffc43c034935bb517e7f02466cdce32e3994ef24a29c50
+    tpl_sha256: 2480af83a65f98da22ffc43c034935bb517e7f02466cdce32e3994ef24a29c50
+  - path: .github/ISSUE_TEMPLATE/bug_report.md
+    sha256: 226e90e2101485cb76911d2348d198620e984c7c6dc8b6ca5c04d2c06281e08f
+    tpl_sha256: 226e90e2101485cb76911d2348d198620e984c7c6dc8b6ca5c04d2c06281e08f
+  - path: .github/ISSUE_TEMPLATE/feature_request.md
+    sha256: 29a633be85b67a444a3eb8ed89aa853863daeaf6f10887929cf600441a149735
+    tpl_sha256: 29a633be85b67a444a3eb8ed89aa853863daeaf6f10887929cf600441a149735
+  - path: tests/smoke.bats
+    sha256: 0c598ab11b233faef9eb08301238a70a842e9de9fceab492bc56b8e134bae21d
+    tpl_sha256: 0c598ab11b233faef9eb08301238a70a842e9de9fceab492bc56b8e134bae21d
+  - path: tests/test_helper.bash
+    sha256: e0b8e16d87ac371ccb3085f0328fb125333b19af7863dade1691a70cede88498
+    tpl_sha256: e0b8e16d87ac371ccb3085f0328fb125333b19af7863dade1691a70cede88498
+  - path: .github/workflows/tests.yml
+    sha256: 41776276f2a3d2346ef4ccc90fbd879deff72b03377e0a29d361cf116dd6ae78
+    tpl_sha256: 41776276f2a3d2346ef4ccc90fbd879deff72b03377e0a29d361cf116dd6ae78

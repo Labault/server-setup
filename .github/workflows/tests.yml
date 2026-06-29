@@ -1,0 +1,31 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  bats:
+    name: bats
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install bats (pinned)
+        uses: bats-core/bats-action@4.0.0
+        with:
+          # Hand the action the job token so release downloads don't hit the
+          # unauthenticated GitHub rate limit. The helper libraries (support,
+          # assert…) aren't needed for a plain `bats tests/` run.
+          github-token: ${{ github.token }}
+          support-install: false
+          assert-install: false
+          detik-install: false
+          file-install: false
+
+      - name: Run the test suite
+        run: bats tests/

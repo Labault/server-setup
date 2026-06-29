@@ -1,0 +1,59 @@
+# Managed by bootstrap (shell profile). Hooks run in `local` mode: they call
+# binaries already available on your machine (installed by mac-setup), not pinned
+# remote repos.
+# Activate with: pre-commit install && pre-commit install --hook-type commit-msg
+minimum_pre_commit_version: "3.0.0"
+default_install_hook_types: [pre-commit, commit-msg]
+
+repos:
+  - repo: local
+    hooks:
+      # --- language-agnostic base ---
+      - id: editorconfig-checker
+        name: editorconfig-checker
+        entry: editorconfig-checker
+        language: system
+        pass_filenames: false
+
+      - id: gitleaks
+        name: gitleaks (staged secrets)
+        entry: gitleaks protect --staged --redact --verbose
+        language: system
+        pass_filenames: false
+
+      - id: shellcheck
+        name: shellcheck
+        entry: shellcheck -x
+        language: system
+        types: [shell]
+
+      - id: markdownlint-cli2
+        name: markdownlint-cli2
+        entry: markdownlint-cli2
+        language: system
+        types: [markdown]
+
+      - id: actionlint
+        name: actionlint
+        entry: actionlint
+        language: system
+        files: ^\.github/workflows/.*\.(ya?ml)$
+
+      # --- shell ---
+      - id: shfmt
+        name: shfmt
+        # shfmt reads .editorconfig for indentation, so no -i flag here. -w fixes
+        # files in place; pre-commit then fails the commit if anything changed.
+        # Exclude .bats: identify tags it `shell`, but shfmt can't parse bats's
+        # `@test` syntax (those files stay shellcheck's job).
+        entry: shfmt -w
+        language: system
+        types: [shell]
+        exclude_types: [bats]
+
+      # --- commit message ---
+      - id: commit-msg-lint
+        name: commit-msg-lint
+        entry: scripts/lint-commit-msg.sh
+        language: script
+        stages: [commit-msg]

@@ -1,0 +1,30 @@
+# EditorConfig — consistent indentation / line endings / charset across editors.
+# https://editorconfig.org
+root = true
+
+# Default to the 2-space norm shared by most web tooling (JS, JSON, YAML, TOML,
+# shell, …) and by extensionless scripts. PHP is the exception below.
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# PHP follows PSR-12 (4 spaces).
+[*.php]
+indent_size = 4
+
+# Markdown: don't enforce an indent size (nested lists under ordered items use
+# 3-space alignment). markdownlint governs Markdown style instead.
+[*.md]
+trim_trailing_whitespace = false
+indent_size = unset
+
+[{Makefile,Makefile.*,*.mk}]
+indent_style = tab
+
+# NEON (PHPStan) is tab-indented — match the tool's own --generate-baseline output.
+[*.neon]
+indent_style = tab

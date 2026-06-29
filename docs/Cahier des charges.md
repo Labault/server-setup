@@ -1,7 +1,7 @@
 # Cahier des charges — `server-setup`
 
 > **Statut : verrouillé.** Toutes les décisions ci-dessous sont arbitrées et figées. Ce document est la source de vérité pour l'implémentation (destiné à Claude Code). Tant qu'une décision figure au §11, elle ne se rediscute pas en cours de build.
-> 
+>
 > **Régénéré à partir de [`bootstrap-web-setup`](https://github.com/Labault/bootstrap-web-setup) mis à jour** (v0.6.0). Délta majeur vs. la v1.1 : la gamme a gagné un **profil `shell`** que bootstrap s'auto-applique. `server-setup` étant lui aussi un repo d'outillage Bash, il **consomme** désormais `bootstrap apply --profile shell` pour son propre outillage qualité, au lieu de le câbler à la main. Détail en §3.2 et Prompt 1.
 
 ---

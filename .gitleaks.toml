@@ -1,0 +1,14 @@
+# Managed by bootstrap. Secret scanning config for gitleaks.
+title = "gitleaks config"
+
+# Build on top of gitleaks' built-in ruleset rather than redefining it.
+[extend]
+useDefault = true
+
+# Add project-specific allowlist entries below as needed.
+[allowlist]
+description = "Global allowlist"
+paths = [
+  '''(^|/)vendor/''',
+  '''(^|/)node_modules/''',
+]

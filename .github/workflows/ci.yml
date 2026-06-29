@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: EditorConfig
+        uses: editorconfig-checker/action-editorconfig-checker@v2.2.0
+
+      - name: Shellcheck
+        uses: ludeeus/action-shellcheck@2.0.0
+
+      - name: Markdown
+        uses: DavidAnson/markdownlint-cli2-action@v23
+        with:
+          globs: "**/*.md"
+
+      - name: Actionlint
+        uses: raven-actions/actionlint@v2
+
+  links:
+    name: Links
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Lychee
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --config lychee.toml --no-progress .
+          fail: true

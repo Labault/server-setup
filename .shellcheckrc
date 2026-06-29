@@ -1,0 +1,3 @@
+# shellcheck configuration.
+# Follow files sourced with a relative path (lib/*.sh style).
+external-sources=true

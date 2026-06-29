@@ -1,0 +1,11 @@
+# Managed by bootstrap. Dependency updates via Dependabot (§11.7).
+# The github-actions ecosystem applies to every profile; symfony/fullstack add
+# composer/npm ecosystems on top.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "⬆️ ci"

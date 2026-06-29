@@ -1,0 +1,19 @@
+# Managed by bootstrap. Dead-link checker config for lychee.
+max_redirects = 5
+max_retries = 2
+retry_wait_time = 2
+timeout = 20
+
+# Treat these as success even when servers are unfriendly to bots.
+accept = [200, 201, 202, 203, 204, 206, 429]
+
+exclude = [
+  "^https?://localhost",
+  "^https?://127\\.0\\.0\\.1",
+  "^https?://0\\.0\\.0\\.0",
+]
+
+exclude_path = [
+  "node_modules",
+  "vendor",
+]
