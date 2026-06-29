@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The SSH cutover now refuses up front (fail-fast) when the `deploy` user has no
+  `authorized_keys`, instead of switching to key-only SSH and relying on the
+  dead-man's switch to rescue a predictable lockout. Override with the explicit
+  `--allow-keyless-ssh-cutover` when the key arrives out-of-band.
 - `server doctor` no longer reports false timezone drift on a box converged with
   a non-UTC `--timezone`: `setup` now persists `timezone` and `paranoid` in
   `state.yaml`, and `doctor` reads them back instead of hardcoding `UTC`. States

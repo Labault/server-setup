@@ -16,6 +16,7 @@ cmd_setup() {
   DESIRED_TIMEZONE="UTC"
   PARANOID=0
   NO_OVERWRITE=0
+  ALLOW_KEYLESS_SSH_CUTOVER=0
   local skip_bin_check=0
 
   while [[ $# -gt 0 ]]; do
@@ -33,6 +34,7 @@ cmd_setup() {
       ;;
     --timezone=*) DESIRED_TIMEZONE="${1#*=}" ;;
     --paranoid) PARANOID=1 ;;
+    --allow-keyless-ssh-cutover) ALLOW_KEYLESS_SSH_CUTOVER=1 ;;
     --skip-bin-check) skip_bin_check=1 ;;
     --no-overwrite) NO_OVERWRITE=1 ;;
     -h | --help)
@@ -46,6 +48,10 @@ Options:
   --profile <p>     Required. Which profile to converge (minimal|docker|web).
   --timezone <tz>   Timezone to set (default: UTC).
   --paranoid        Enable the sysctl network-hardening baseline (D6).
+  --allow-keyless-ssh-cutover
+                    Crowbar: proceed with the key-only SSH cutover even if the
+                    deploy user has no authorized_keys. Use ONLY when the key
+                    arrives out-of-band — otherwise you WILL be locked out.
   --skip-bin-check  Skip the required-binary guard.
   --no-overwrite    Do not overwrite existing managed files.
   --dry-run         Show what would be converged without acting.

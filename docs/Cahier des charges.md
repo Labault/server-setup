@@ -296,6 +296,7 @@ Pour chaque unité du profil (héritage résolu) : **évaluer l'assertion** → 
 
 C'est la fonctionnalité qui distingue `server-setup` d'un script de durcissement random. Le drop-in SSH (unité 12) est le seul geste qui peut te verrouiller dehors. Donc, **uniquement sur une mutation SSH réellement restrictive** (D9, décision durcie : pas d'armement si le drop-in est déjà en place et inchangé) :
 
+0. **Garde préalable (fail-fast)** : refuser le cutover **avant** de toucher au drop-in si l'utilisateur `deploy` n'a **aucune `authorized_keys`**. Le self-test (étape 2) valide la _config_ avec une clé **éphémère** : il ne prouve pas qu'on pourra se reconnecter en `deploy`. Sans clé réelle, le passage en key-only est un lockout prévisible que seul le coupe-circuit rattraperait, ce qui en fait un mauvais filet pour une condition connue d'avance. On échoue donc avec un message qui dit comment réparer (seeder une clé pour `deploy`), **sans rien installer ni armer**. Override explicite et volontairement moche, `--allow-keyless-ssh-cutover`, réservé au cas où la clé arrive hors-bande.
 1. Écrire le drop-in candidat, puis **`sshd -t` sur la config fusionnée** — si la config est invalide, on abandonne avant tout reload.
 2. **Self-test loopback** : vérifier qu'une connexion par **clé** sur `127.0.0.1` passe avec la nouvelle config.
 3. **Armer le coupe-circuit** : `systemd-run --on-active=10min` qui **restaure** le drop-in précédent et **reload** SSH si `server confirm` n'est pas venu. État passé à `pending-confirmation` dans `state.yaml`.

@@ -89,6 +89,38 @@ setup() {
   [[ "$output" == *"/templates/sysctl/99-server-setup.paranoid.conf" ]]
 }
 
+@test "deploy_has_authorized_key: true only when the key file is non-empty" {
+  # Shadow getent so the pure helper resolves a home we control (read-only, no
+  # real user touched). The passwd 6th field is the home directory. Note the
+  # var is NOT named `home`: the helper has a `local home`, which would shadow it
+  # inside the stub's command substitution.
+  local khome="$BATS_TEST_TMPDIR/deployhome"
+  mkdir -p "$khome/.ssh"
+  # shellcheck disable=SC2329  # invoked indirectly, from inside the helper.
+  getent() { printf 'deploy:x:1000:1000::%s:/bin/bash\n' "$khome"; }
+
+  # No file -> ko.
+  run deploy_has_authorized_key
+  [ "$status" -ne 0 ]
+
+  # Empty file -> ko (an empty authorized_keys is as good as none).
+  : >"$khome/.ssh/authorized_keys"
+  run deploy_has_authorized_key
+  [ "$status" -ne 0 ]
+
+  # Non-empty file -> ok.
+  echo 'ssh-ed25519 AAAA... test@box' >"$khome/.ssh/authorized_keys"
+  run deploy_has_authorized_key
+  [ "$status" -eq 0 ]
+}
+
+@test "deploy_has_authorized_key: false when the user has no home" {
+  # shellcheck disable=SC2329  # invoked indirectly, from inside the helper.
+  getent() { printf ''; }
+  run deploy_has_authorized_key
+  [ "$status" -ne 0 ]
+}
+
 @test "friday_wink quacks when forced and never blocks (D14)" {
   SERVER_FORCE_FRIDAY=1
   run friday_wink

@@ -17,5 +17,15 @@ RUN apt-get update -qq && \
     systemctl enable ssh && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /var/log/*
 
+# A real provisioned VPS always has root's authorized_keys (that's how you SSH in
+# to run server-setup at all). Seed a dummy one so the box mirrors that: the SSH
+# cutover's safety gate refuses key-only SSH when `deploy` has no key, and on a
+# real box `deploy` inherits this very key via the deploy-user seed. Content only
+# needs to be non-empty for the gate.
+RUN install -d -m 0700 /root/.ssh && \
+    echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA validation-box-dummy' \
+        > /root/.ssh/authorized_keys && \
+    chmod 0600 /root/.ssh/authorized_keys
+
 STOPSIGNAL SIGRTMIN+3
 CMD ["/sbin/init"]

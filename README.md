@@ -99,7 +99,7 @@ you let a heuristic guess, so there's no default and no `detect`.
 
 ## Gotchas
 
-Three things will bite you if you don't know them. They're by design.
+Four things will bite you if you don't know them. They're by design.
 
 1. **Confirm before any reboot.** The SSH cutover (root off, password off) arms a
    `systemd-run` dead-man's switch that rolls SSH back if you don't `server confirm`
@@ -114,6 +114,12 @@ Three things will bite you if you don't know them. They're by design.
    firewall. The rule of the house: **only the Caddy proxy publishes 80/443**; every
    app service stays on an internal network. `server doctor` asserts no other
    container publishes those ports. `ufw-docker` is opt-in, never enabled by default.
+4. **No key, no cutover.** The cutover refuses up front if the `deploy` user has no
+   `authorized_keys`: key-only SSH with no key is a guaranteed lockout, and the
+   dead-man's switch is a poor net for a problem you can see coming. `deploy`
+   normally inherits root's incoming key during convergence; if you're seeding the
+   key out-of-band, force it with `--allow-keyless-ssh-cutover` (the crowbar, and it
+   looks like one on purpose).
 
 ## Testing & proof
 

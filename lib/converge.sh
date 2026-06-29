@@ -188,6 +188,17 @@ seed_deploy_authorized_keys() {
   fi
 }
 
+# deploy_has_authorized_key -> 0 if the deploy user's authorized_keys exists and
+# is non-empty, 1 otherwise. Pure/read-only: it's the cutover safety gate, so it
+# must never mutate. A non-empty file is the proof that key-only SSH won't lock
+# us out (the seed above is best-effort, so this is checked, not assumed).
+deploy_has_authorized_key() {
+  local home
+  home="$(getent passwd "$DEPLOY_USER" | cut -d: -f6)"
+  [[ -n "$home" ]] || return 1
+  [[ -s "$home/.ssh/authorized_keys" ]]
+}
+
 do_ufw_base() {
   ensure_pkg ufw
   # Order is vital (anti-lockout): set policy, ALLOW 22, and only THEN enable.
@@ -414,6 +425,20 @@ EOF
 do_ssh_hardening() {
   local tpl="$SERVER_ROOT/templates/ssh/99-server-setup.conf"
   local dropin=/etc/ssh/sshd_config.d/99-server-setup.conf
+
+  # Fail-fast safety gate (§9.4): the self-test validates the CONFIG with an
+  # EPHEMERAL key, so a passing self-test does NOT prove you can reconnect as
+  # deploy. If deploy has no real key, key-only SSH would lock you out and only
+  # the dead-man's switch would save you. Refuse BEFORE touching the drop-in —
+  # we install nothing and arm nothing. Override only if the key arrives
+  # out-of-band (you own the lockout risk then).
+  if [[ "${ALLOW_KEYLESS_SSH_CUTOVER:-0}" != 1 ]] && ! deploy_has_authorized_key; then
+    die "refusing the SSH cutover: ${DEPLOY_USER} has no authorized_keys — key-only SSH would lock you out.
+  Fix it first: seed a key for ${DEPLOY_USER} (add one to /root/.ssh/authorized_keys, then re-run setup,
+  or once --authorized-keys lands, pass it explicitly). If the key arrives out-of-band and you accept
+  the lockout risk, re-run with --allow-keyless-ssh-cutover."
+  fi
+
   ensure_pkg openssh-server
   command -v ssh >/dev/null 2>&1 || ensure_pkg openssh-client
   # Privilege-separation dir: `sshd -t` (and the self-test's throwaway sshd)
