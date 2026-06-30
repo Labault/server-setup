@@ -4,7 +4,7 @@
 [![Tests](https://github.com/Labault/server-setup/actions/workflows/tests.yml/badge.svg)](https://github.com/Labault/server-setup/actions/workflows/tests.yml)
 [![Validation](https://github.com/Labault/server-setup/actions/workflows/validation.yml/badge.svg)](https://github.com/Labault/server-setup/actions/workflows/validation.yml)
 [![Security](https://github.com/Labault/server-setup/actions/workflows/security.yml/badge.svg)](https://github.com/Labault/server-setup/actions/workflows/security.yml)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](VERSION)
+[![Version](https://img.shields.io/github/v/tag/Labault/server-setup)](https://github.com/Labault/server-setup/tags)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Take a bare Ubuntu VPS and converge it into a **hardened, deployable server**, up
