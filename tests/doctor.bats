@@ -44,7 +44,7 @@ setup() {
   STATE_FILES=()
   STATE_ASSERTIONS=()
   # The globals setup poses, mirroring a `--timezone Europe/Paris --paranoid
-  # --ufw-docker --user ci-deploy` run.
+  # --ufw-docker --deploy-user ci-deploy` run.
   DESIRED_TIMEZONE="Europe/Paris"
   PARANOID=1
   UFW_DOCKER=1
@@ -90,8 +90,8 @@ EOF
   UFW_DOCKER="$(state_ufw_docker "$STATE_FILE")"
   [[ -n "$UFW_DOCKER" ]] || UFW_DOCKER=0
   [ "$UFW_DOCKER" = "0" ]
-  # Empty deploy_user -> the historical name, so a box converged before --user
-  # existed still checks the account it actually has.
+  # Empty deploy_user -> the historical name, so a box converged before
+  # --deploy-user existed still checks the account it actually has.
   DEPLOY_USER="$(state_deploy_user "$STATE_FILE")"
   [[ -n "$DEPLOY_USER" ]] || DEPLOY_USER=deploy
   [ "$DEPLOY_USER" = "deploy" ]

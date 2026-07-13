@@ -83,7 +83,7 @@ setup() {
     }
   done
   # Uppercase, dots, spaces, a leading digit or dash, a path, a 33-char name:
-  # all rejected on format, before --user can half-create an account.
+  # all rejected on format, before --deploy-user can half-create an account.
   for name in "" "Deploy" "a.b" "a b" "1deploy" "-deploy" "de/ploy" "root:x" "$(printf 'd%.0s' {1..33})"; do
     run valid_deploy_user "$name"
     [ "$status" -ne 0 ] || {
@@ -93,9 +93,9 @@ setup() {
   done
 }
 
-@test "the deploy user's name is a default, not a constant (--user overrides it)" {
+@test "the deploy user's name is a default, not a constant (--deploy-user overrides it)" {
   # Every deploy-user predicate/action keys off DEPLOY_USER, so overriding the
-  # variable is all `--user` has to do — nothing may hardcode 'deploy'.
+  # variable is all `--deploy-user` has to do — nothing may hardcode 'deploy'.
   DEPLOY_USER=ci-deploy
   run unit_describe deploy-user
   [[ "$output" == *"ci-deploy"* ]]

@@ -80,8 +80,9 @@ EOF
   # skipped below (unit_inactive), exactly as during setup.
   UFW_DOCKER="$(state_ufw_docker "$STATE_FILE")"
   [[ -n "$UFW_DOCKER" ]] || UFW_DOCKER=0
-  # --user is a setup-time choice the predicates all key off. Older states (and
-  # boxes converged without the flag) have no deploy_user -> the historical name.
+  # --deploy-user is a setup-time choice the predicates all key off. Older states
+  # (and boxes converged without the flag) have no deploy_user -> the historical
+  # name.
   DEPLOY_USER="$(state_deploy_user "$STATE_FILE")"
   [[ -n "$DEPLOY_USER" ]] || DEPLOY_USER=deploy
 

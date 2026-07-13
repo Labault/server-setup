@@ -36,12 +36,12 @@ cmd_setup() {
       shift
       ;;
     --timezone=*) DESIRED_TIMEZONE="${1#*=}" ;;
-    --user)
-      [[ $# -ge 2 ]] || die "--user requires a value"
+    --deploy-user)
+      [[ $# -ge 2 ]] || die "--deploy-user requires a value"
       DEPLOY_USER="$2"
       shift
       ;;
-    --user=*) DEPLOY_USER="${1#*=}" ;;
+    --deploy-user=*) DEPLOY_USER="${1#*=}" ;;
     --paranoid) PARANOID=1 ;;
     --ufw-docker) UFW_DOCKER=1 ;;
     --authorized-keys)
@@ -63,7 +63,8 @@ Converge the box toward the profile's desired state and write state.yaml.
 Options:
   --profile <p>     Required. Which profile to converge (minimal|docker|web).
   --timezone <tz>   Timezone to set (default: UTC).
-  --user <name>     Name of the non-root sudoer to converge (default: deploy).
+  --deploy-user <name>
+                    Name of the non-root sudoer to converge (default: deploy).
                     A bootstrap-time choice: changing it on an already-converged
                     box creates the new account and rewrites the sudoers to its
                     name; the old account is left alone (we never delete a user).
@@ -97,14 +98,14 @@ EOF
   # --profile is mandatory and explicit: no silent default, no `detect` (A1).
   [[ -n "$profile" ]] || die "--profile is required (minimal|docker|web). There is no default."
 
-  # Reject a bad --user BEFORE any mutation (and even under --dry-run): a typo
-  # must never half-create an account. Two gates: a name useradd would accept,
-  # and a name that isn't root — the whole point of the unit is a NON-root
+  # Reject a bad --deploy-user BEFORE any mutation (and even under --dry-run): a
+  # typo must never half-create an account. Two gates: a name useradd would
+  # accept, and a name that isn't root — the whole point of the unit is a NON-root
   # sudoer, and the SSH cutover turns root login off right after.
   valid_deploy_user "$DEPLOY_USER" ||
-    die "--user: invalid username '${DEPLOY_USER}' (expected [a-z_][a-z0-9_-]*, max 32 chars)"
+    die "--deploy-user: invalid username '${DEPLOY_USER}' (expected [a-z_][a-z0-9_-]*, max 32 chars)"
   if [[ "$(id -u "$DEPLOY_USER" 2>/dev/null || printf -- -1)" == 0 ]]; then
-    die "--user: '${DEPLOY_USER}' is uid 0 — server-setup converges a NON-root sudoer, and the SSH cutover disables root login."
+    die "--deploy-user: '${DEPLOY_USER}' is uid 0 — server-setup converges a NON-root sudoer, and the SSH cutover disables root login."
   fi
 
   # If admin keys were given, fail fast on a bad path BEFORE any mutation (and

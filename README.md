@@ -80,8 +80,8 @@ them into the `deploy` user, appended and deduped. It decouples `deploy` from
 whatever key root happened to have, and it's what lets the SSH cutover pass its
 key gate. Without it, `deploy` inherits root's incoming key (the old behaviour).
 
-`--user <name>` converges another non-root sudoer than `deploy` (useful on images
-that already ship an `ubuntu` account). The name lands in `state.yaml`, so
+`--deploy-user <name>` converges another non-root sudoer than `deploy` (useful on
+images that already ship an `ubuntu` account). The name lands in `state.yaml`, so
 `doctor` checks the account the box actually has. It's a bootstrap-time choice:
 set it on a converged box and you get a *second* account, the old one is left
 alone. `root` is refused.

@@ -12,8 +12,8 @@
 
 # --- Shared constants --------------------------------------------------------
 # The deploy user's NAME is the one thing here that isn't a constant: `setup
-# --user <name>` overrides it, and `doctor` reads it back from state.yaml. Both
-# assign it before calling any predicate, so `deploy` is only the default.
+# --deploy-user <name>` overrides it, and `doctor` reads it back from state.yaml.
+# Both assign it before calling any predicate, so `deploy` is only the default.
 # DEPLOY_SUDOERS stays a fixed path on purpose: it's the managed file of the
 # deploy-user UNIT (hashed in state.yaml), not a per-account file — its CONTENT
 # carries the name, so a box never ends up with two live sudoers drop-ins.

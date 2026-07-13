@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `server setup --user <name>` converges a non-root sudoer under a name of your
-  choice instead of `deploy` (handy on images that already ship an `ubuntu`
+- `server setup --deploy-user <name>` converges a non-root sudoer under a name of
+  your choice instead of `deploy` (handy on images that already ship an `ubuntu`
   account). The name is persisted as `deploy_user` in `state.yaml` and read back
   by `doctor`, so the predicates check the account the box actually has rather
   than reporting drift on a `deploy` that was never created. A bad name (or
