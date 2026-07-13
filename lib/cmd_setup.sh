@@ -74,6 +74,7 @@ Options:
                     never auto-enabled; without it only the consultative guard
                     runs. ufw-docker rewrites ufw's tables and can surprise you —
                     strict opt-in. See docs/profiles/web.md.
+  --authorized-keys <file>
                     Seed the deploy user with the admin public key(s) in <file>
                     (one per line), appended and deduped. Decouples deploy from
                     whatever /root had; this is what lets the SSH cutover pass
