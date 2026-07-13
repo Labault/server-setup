@@ -158,6 +158,14 @@ unit_describe() {
 # Per-unit actions (do_*). Each returns 0 on success, non-zero on failure.
 # ---------------------------------------------------------------------------
 
+# valid_deploy_user <name> -> 0 when <name> is a name useradd will actually
+# accept (Debian's default NAME_REGEX, minus the trailing '$' of machine
+# accounts, which a human sudoer has no business carrying). Pure: `setup` calls
+# it to reject a typo BEFORE any mutation, so we never half-create an account.
+valid_deploy_user() {
+  [[ "$1" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]]
+}
+
 do_deploy_user() {
   local user="$DEPLOY_USER"
   if ! id -u "$user" >/dev/null 2>&1; then

@@ -43,6 +43,10 @@ write_server_state() {
     # from the globals setup poses; defaulted for safety.
     printf 'timezone: %s\n' "${DESIRED_TIMEZONE:-UTC}"
     printf 'paranoid: %s\n' "${PARANOID:-0}"
+    # The non-root sudoer's name (--user). Every deploy-user predicate keys off
+    # it, so doctor MUST read back the name setup converged — otherwise it would
+    # look for `deploy` on a box that has none and report phantom drift.
+    printf 'deploy_user: %s\n' "${DEPLOY_USER:-deploy}"
     # Opt-in ufw-docker enforcement (D8). Persisted so doctor knows whether the
     # ufw-docker-enforce unit is active for this box (it isn't derivable from disk
     # alone, and the unit is skipped — not asserted — when off).

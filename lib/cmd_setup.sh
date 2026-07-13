@@ -19,6 +19,7 @@ cmd_setup() {
   ALLOW_KEYLESS_SSH_CUTOVER=0
   UFW_DOCKER=0
   ADMIN_KEYS_FILE=""
+  DEPLOY_USER="deploy"
   local skip_bin_check=0
 
   while [[ $# -gt 0 ]]; do
@@ -35,6 +36,12 @@ cmd_setup() {
       shift
       ;;
     --timezone=*) DESIRED_TIMEZONE="${1#*=}" ;;
+    --user)
+      [[ $# -ge 2 ]] || die "--user requires a value"
+      DEPLOY_USER="$2"
+      shift
+      ;;
+    --user=*) DEPLOY_USER="${1#*=}" ;;
     --paranoid) PARANOID=1 ;;
     --ufw-docker) UFW_DOCKER=1 ;;
     --authorized-keys)
@@ -56,6 +63,10 @@ Converge the box toward the profile's desired state and write state.yaml.
 Options:
   --profile <p>     Required. Which profile to converge (minimal|docker|web).
   --timezone <tz>   Timezone to set (default: UTC).
+  --user <name>     Name of the non-root sudoer to converge (default: deploy).
+                    A bootstrap-time choice: changing it on an already-converged
+                    box creates the new account and rewrites the sudoers to its
+                    name; the old account is left alone (we never delete a user).
   --paranoid        Enable the sysctl network-hardening baseline (D6).
   --ufw-docker      web profile only. Opt-in (D8): install the pinned ufw-docker
                     integration so ufw actually governs the ports Docker
@@ -85,6 +96,16 @@ EOF
   # --profile is mandatory and explicit: no silent default, no `detect` (A1).
   [[ -n "$profile" ]] || die "--profile is required (minimal|docker|web). There is no default."
 
+  # Reject a bad --user BEFORE any mutation (and even under --dry-run): a typo
+  # must never half-create an account. Two gates: a name useradd would accept,
+  # and a name that isn't root — the whole point of the unit is a NON-root
+  # sudoer, and the SSH cutover turns root login off right after.
+  valid_deploy_user "$DEPLOY_USER" ||
+    die "--user: invalid username '${DEPLOY_USER}' (expected [a-z_][a-z0-9_-]*, max 32 chars)"
+  if [[ "$(id -u "$DEPLOY_USER" 2>/dev/null || printf -- -1)" == 0 ]]; then
+    die "--user: '${DEPLOY_USER}' is uid 0 — server-setup converges a NON-root sudoer, and the SSH cutover disables root login."
+  fi
+
   # If admin keys were given, fail fast on a bad path BEFORE any mutation (and
   # even under --dry-run): an unreadable or empty key file is a typo, not a key.
   if [[ -n "$ADMIN_KEYS_FILE" ]]; then
@@ -97,7 +118,7 @@ EOF
   # Resolve the inheritance chain (validates the profile too).
   local chain
   chain="$(resolve_chain "$profile" | paste -sd ' ' -)"
-  log_info "profile ${C_BOLD}${profile}${C_RESET} (chain: ${chain}) — timezone ${DESIRED_TIMEZONE}$([[ "$PARANOID" == 1 ]] && printf ', paranoid')"
+  log_info "profile ${C_BOLD}${profile}${C_RESET} (chain: ${chain}) — user ${DEPLOY_USER}, timezone ${DESIRED_TIMEZONE}$([[ "$PARANOID" == 1 ]] && printf ', paranoid')"
 
   # --- Mutating runs only: EUID 0 (§9.2, decision B) + required-binary guard ---
   if ! is_dry_run; then

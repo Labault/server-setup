@@ -74,6 +74,38 @@ setup() {
   done
 }
 
+@test "valid_deploy_user accepts real usernames and rejects what useradd would refuse" {
+  for name in deploy ubuntu ci-deploy _svc d admin_2; do
+    run valid_deploy_user "$name"
+    [ "$status" -eq 0 ] || {
+      echo "should accept: $name"
+      false
+    }
+  done
+  # Uppercase, dots, spaces, a leading digit or dash, a path, a 33-char name:
+  # all rejected on format, before --user can half-create an account.
+  for name in "" "Deploy" "a.b" "a b" "1deploy" "-deploy" "de/ploy" "root:x" "$(printf 'd%.0s' {1..33})"; do
+    run valid_deploy_user "$name"
+    [ "$status" -ne 0 ] || {
+      echo "should reject: $name"
+      false
+    }
+  done
+}
+
+@test "the deploy user's name is a default, not a constant (--user overrides it)" {
+  # Every deploy-user predicate/action keys off DEPLOY_USER, so overriding the
+  # variable is all `--user` has to do — nothing may hardcode 'deploy'.
+  DEPLOY_USER=ci-deploy
+  run unit_describe deploy-user
+  [[ "$output" == *"ci-deploy"* ]]
+  run unit_describe deploy-docker-group
+  [[ "$output" == *"ci-deploy"* ]]
+  # The sudoers file is the unit's managed file, so its PATH stays fixed.
+  run unit_managed_file deploy-user
+  [[ "$output" == *"/etc/sudoers.d/90-server-setup-deploy"* ]]
+}
+
 @test "resolve_chain rejects a path-traversal profile before touching the filesystem" {
   run resolve_chain "../../etc/passwd"
   [ "$status" -ne 0 ]

@@ -11,7 +11,13 @@
 # Naming: assert_<unit id with dashes turned to underscores>.
 
 # --- Shared constants --------------------------------------------------------
-DEPLOY_USER="deploy"
+# The deploy user's NAME is the one thing here that isn't a constant: `setup
+# --user <name>` overrides it, and `doctor` reads it back from state.yaml. Both
+# assign it before calling any predicate, so `deploy` is only the default.
+# DEPLOY_SUDOERS stays a fixed path on purpose: it's the managed file of the
+# deploy-user UNIT (hashed in state.yaml), not a per-account file — its CONTENT
+# carries the name, so a box never ends up with two live sudoers drop-ins.
+DEPLOY_USER="${DEPLOY_USER:-deploy}"
 DEPLOY_SUDOERS="/etc/sudoers.d/90-server-setup-deploy"
 SWAP_FILE="/swapfile"
 SWAP_SIZE_BYTES=$((2 * 1024 * 1024 * 1024)) # 2 GiB

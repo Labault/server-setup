@@ -13,7 +13,7 @@ None. Every unit uses tools already on a base Ubuntu image (`useradd`, `ufw`,
 
 | Unit | What it does | Trace |
 | --- | --- | --- |
-| `deploy-user` | non-root `deploy`, in `sudo`, `NOPASSWD` sudoers **validated by `visudo -cf` before install**, `authorized_keys` seeded from the incoming root key | sudoers file + assertion |
+| `deploy-user` | non-root `deploy` (rename it with `--user <name>`), in `sudo`, `NOPASSWD` sudoers **validated by `visudo -cf` before install**, `authorized_keys` seeded from the incoming root key | sudoers file + assertion |
 | `ufw-base` | `default deny incoming` / `allow out`, `allow 22`, **then** enable, never before the rule (anti-lockout) | assertion |
 | `fail2ban` | `sshd` jail (systemd backend, `bantime 1h` / `findtime 10m` / `maxretry 5`) | `jail.local` + assertion |
 | `unattended-upgrades` | auto security updates + **auto-reboot at 04:00** | apt drop-in + assertion |
@@ -40,9 +40,19 @@ loopback key self-test → arm a 10-minute `systemd-run` dead-man's switch →
 window, or it rolls back automatically. **Confirm before any reboot** (the timer
 lives in memory).
 
+## The deploy user's name
+
+`deploy` by default; `--user <name>` converges another non-root sudoer instead
+(handy on images that already ship an `ubuntu` account). The name is persisted in
+`state.yaml`, so `doctor` checks the account the box actually has. It's a
+**bootstrap-time choice**: changing it on a converged box creates the new account
+and rewrites the sudoers to its name, but leaves the old account in place, we
+never delete a user. `root` (and anything at uid 0) is refused: the unit's whole
+point is a non-root sudoer, and the cutover turns root login off right after.
+
 ## Parameters (locked)
 
-- `deploy` user with **`NOPASSWD` sudo**, validated by **`visudo -cf`**.
+- `deploy` user (or `--user <name>`) with **`NOPASSWD` sudo**, validated by **`visudo -cf`**.
 - Timezone **UTC** (override `--timezone`); locale **`en_US.UTF-8`**.
 - Swap **2 GiB**, **`swappiness 10`**. Unattended reboot **04:00**.
 - Sysctl baseline **empty**; all network hardening behind **`--paranoid`**.

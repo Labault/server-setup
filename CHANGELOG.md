@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `server setup --user <name>` converges a non-root sudoer under a name of your
+  choice instead of `deploy` (handy on images that already ship an `ubuntu`
+  account). The name is persisted as `deploy_user` in `state.yaml` and read back
+  by `doctor`, so the predicates check the account the box actually has rather
+  than reporting drift on a `deploy` that was never created. A bad name (or
+  anything at uid 0, `root` included) is refused *before* any mutation, even
+  under `--dry-run`. The sudoers drop-in keeps its fixed path — it's the unit's
+  managed file, and its content carries the name — so a box can never end up with
+  two live sudoers. Default behaviour is unchanged: no flag, still `deploy`.
+  Validation case `58-custom-deploy-user`.
+
 ## [0.2.0] - 2026-06-29
 
 ### Security
