@@ -282,7 +282,7 @@ Et voici ce qui **atterrit sur le serveur** après `server setup --profile web` 
 |`server update`|Met à jour `server-setup` lui-même (`git pull` dans `/opt`). **Ne touche pas au serveur convergé.**|
 |`server prune-backups`|Purge les backups horodatés (`--older-than <dur>` et/ou `--keep <n>`). Reclaim explicite de l'opérateur, **pas d'auto-purge** (§9.6).|
 
-Drapeaux notables : `--paranoid` (active la baseline sysctl, D6), `--timezone <tz>` (sinon UTC), `--skip-bin-check`, `--no-overwrite`. Pas de `detect`, pas de `reconcile`.
+Drapeaux notables : `--paranoid` (active la baseline sysctl, D6), `--timezone <tz>` (sinon UTC), `--deploy-user <name>` (nomme le sudoer non-root, sinon `deploy`), `--authorized-keys <fichier>` (sème les clés admin dans le sudoer, §10.4), `--ufw-docker` (enforcement ufw × Docker, opt-in, D8), `--skip-bin-check`, `--no-overwrite`. Pas de `detect`, pas de `reconcile`.
 
 ### 9.2 Étape 0 — gardes bloquantes
 
